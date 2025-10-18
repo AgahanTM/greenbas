@@ -1,4 +1,7 @@
-{
+// app.config.js
+import 'dotenv/config';
+
+export default {
   "expo": {
     "name": "greenbas",
     "slug": "greenbas",
@@ -38,11 +41,28 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan meals."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "env": true
+          }
+        }
+      },
+      // This line now works correctly because it's in a .js file
+      "GEMINI_API_KEY": process.env.GEMINI_API_KEY
     }
   }
-}
+};

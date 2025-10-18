@@ -1,312 +1,371 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { Lock, User } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Easing,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    View
-} from "react-native";
-import { FormField } from "../components/FormField";
-
-const { width, height } = Dimensions.get("window");
+  Animated,
+  Easing,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 export default function LoginScreen() {
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-  });
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [focused, setFocused] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-  // Enhanced animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideUpAnim = useRef(new Animated.Value(30)).current;
-  const logoScale = useRef(new Animated.Value(0.8)).current;
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const backgroundAnim = useRef(new Animated.Value(0)).current;
-
-  // Sophisticated background gradient animation
-  const backgroundColor = backgroundAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#059669', '#10b981']
-  });
 
   useEffect(() => {
-    // Staggered animations with better timing
-    Animated.parallel([
-      Animated.timing(backgroundAnim, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: false,
-      }),
-      Animated.stagger(100, [
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 1000,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideUpAnim, {
-            toValue: 0,
-            duration: 1000,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.spring(logoScale, {
-            toValue: 1,
-            friction: 8,
-            useNativeDriver: true,
-          })
-        ])
-      ])
-    ]).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (error) setError("");
-  };
-
   const handleLogin = async () => {
-    if (!formData.username.trim() || !formData.password) {
-      setError("Please enter both username and password");
+    if (!username.trim() || !password.trim()) {
+      setError('Please enter both username and password.');
       return;
     }
 
+    setError('');
     setIsLoading(true);
-    
-    // Simulate API call
+
+    // Simulate login delay
     setTimeout(() => {
       setIsLoading(false);
-      if (formData.username === "demo" && formData.password === "password") {
-        router.replace("/(tabs)/discovery");
-      } else {
-        setError("Invalid username or password");
-      }
-    }, 1500);
-  };
-
-  const onPressIn = () => {
-    Animated.spring(buttonScale, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = () => {
-    Animated.spring(buttonScale, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
+      router.replace('/(tabs)/discovery');
+    }, 800);
   };
 
   return (
-    <Animated.View style={{ backgroundColor }} className="flex-1">
-      <ScrollView 
+    <LinearGradient
+      colors={['#34D399', '#10B981', '#059669']}
+      style={styles.container}
+    >
+      <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
+        keyboardShouldPersistTaps="handled"
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
-          {/* Header Section */}
-          <View className="pt-20 pb-12 px-8 items-center">
-            <Animated.View 
-              style={{
-                opacity: fadeAnim,
-                transform: [{ scale: logoScale }]
-              }}
-              className="items-center"
-            >
-              <View className="bg-white/20 p-6 rounded-3xl mb-6 shadow-2xl">
+          <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+            {/* Logo Section */}
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}>
                 <Image
-                  source={{ uri: "https://i.ibb.co/6gS35zJ/green-leaf-logo.png" }}
-                  style={{ width: 80, height: 80 }}
+                  source={{ uri: 'https://i.ibb.co/6gS35zJ/green-leaf-logo.png' }}
+                  style={styles.logoImage}
                   resizeMode="contain"
                 />
               </View>
-              <Text className="text-5xl font-black text-white text-center mb-3">
-                GreenBasket
-              </Text>
-              <Text className="text-white/90 text-lg font-light tracking-wide">
-                Eat smarter. Waste less.
-              </Text>
-            </Animated.View>
-          </View>
-
-          {/* Login Card */}
-          <Animated.View 
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateY: slideUpAnim }]
-            }}
-            className="flex-1 bg-white rounded-t-[40px] px-8 pt-12 pb-8 shadow-2xl"
-          >
-            <View className="items-center mb-8">
-              <Text className="text-3xl font-bold text-gray-900 mb-2">
-                Welcome Back
-              </Text>
-              <Text className="text-gray-600 text-base">
-                Sign in to continue your journey
-              </Text>
+              <Text style={styles.appName}>GreenBasket</Text>
+              <Text style={styles.tagline}>Fresh recipes, naturally</Text>
             </View>
 
-            {/* Form Fields */}
-            <View className="space-y-6 mb-8">
-              <View>
-                <Text className="text-gray-700 font-semibold mb-3 text-sm uppercase tracking-wide">
-                  Username
-                </Text>
-                <FormField
-                  icon="mail-outline"
-                  placeholder="Enter your username"
-                  value={formData.username}
-                  onChangeText={(value) => handleInputChange('username', value)}
-                  onFocus={() => setFocused("username")}
-                  onBlur={() => setFocused(null)}
-                  isFocused={focused === "username"}
-                  autoCapitalize="none"
-                  style="bg-gray-50 border-gray-200"
-                />
+            {/* Login Form */}
+            <View style={styles.formContainer}>
+              <Text style={styles.greeting}>Hello!</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Username</Text>
+                <View style={styles.inputContainer}>
+                  <User color="#94a3b8" size={20} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.inputWithIcon}
+                    placeholder="Enter your username"
+                    placeholderTextColor="#94a3b8"
+                    value={username}
+                    onChangeText={setUsername}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+                </View>
               </View>
 
-              <View>
-                <Text className="text-gray-700 font-semibold mb-3 text-sm uppercase tracking-wide">
-                  Password
-                </Text>
-                <FormField
-                  icon="lock-closed-outline"
-                  placeholder="Enter your password"
-                  secureTextEntry={!showPassword}
-                  value={formData.password}
-                  onChangeText={(value) => handleInputChange('password', value)}
-                  onFocus={() => setFocused("password")}
-                  onBlur={() => setFocused(null)}
-                  isFocused={focused === "password"}
-                  rightIcon={
-                    <Pressable 
-                      onPress={() => setShowPassword(!showPassword)}
-                      className="p-2"
-                    >
-                      <Ionicons 
-                        name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                        size={20} 
-                        color="#6b7280" 
-                      />
-                    </Pressable>
-                  }
-                  style="bg-gray-50 border-gray-200"
-                />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Password</Text>
+                <View style={styles.inputContainer}>
+                  <Lock color="#94a3b8" size={20} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.inputWithIcon}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#94a3b8"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+                </View>
               </View>
-            </View>
 
-            {/* Error Message */}
-            {error && (
-              <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex-row items-center">
-                <Ionicons name="alert-circle" size={20} color="#dc2626" />
-                <Text className="text-red-700 ml-2 flex-1 font-medium">
-                  {error}
-                </Text>
-              </View>
-            )}
+              {error && <Text style={styles.errorText}>{error}</Text>}
 
-            {/* Login Button */}
-            <Animated.View style={{ transform: [{ scale: buttonScale }] }} className="mb-6">
-              <Pressable
+              <TouchableOpacity
                 onPress={handleLogin}
-                onPressIn={onPressIn}
-                onPressOut={onPressOut}
                 disabled={isLoading}
-                className={`rounded-2xl overflow-hidden shadow-lg ${
-                  isLoading ? 'opacity-80' : ''
-                }`}
+                activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#10b981', '#059669']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  className="py-5 items-center"
+                  colors={['#10B981', '#059669']}
+                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
                 >
-                  {isLoading ? (
-                    <View className="flex-row items-center">
-                      <ActivityIndicator size="small" color="white" />
-                      <Text className="text-white text-lg font-semibold ml-3">
-                        Signing In...
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text className="text-white text-lg font-semibold">
-                      Sign In
-                    </Text>
-                  )}
+                  <Text style={styles.loginButtonText}>
+                    {isLoading ? 'Logging in...' : 'Login'}
+                  </Text>
                 </LinearGradient>
-              </Pressable>
-            </Animated.View>
+              </TouchableOpacity>
 
-            {/* Divider */}
-            <View className="flex-row items-center mb-6">
-              <View className="flex-1 h-px bg-gray-200" />
-              <Text className="text-gray-500 mx-4 font-medium text-sm">OR</Text>
-              <View className="flex-1 h-px bg-gray-200" />
-            </View>
+              <TouchableOpacity
+                style={styles.forgotContainer}
+                onPress={() => alert('Forgot Password functionality coming soon!')}
+              >
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
 
-            {/* Social Login */}
-            <View className="flex-row justify-between mb-8">
-              <Pressable className="flex-1 bg-white border border-gray-200 rounded-xl p-4 mr-2 shadow-sm">
-                <View className="items-center">
-                  <Ionicons name="logo-google" size={24} color="#dc2626" />
-                  <Text className="text-gray-700 font-medium mt-1 text-sm">Google</Text>
-                </View>
-              </Pressable>
-              
-              <Pressable className="flex-1 bg-white border border-gray-200 rounded-xl p-4 mx-2 shadow-sm">
-                <View className="items-center">
-                  <Ionicons name="logo-apple" size={24} color="#000000" />
-                  <Text className="text-gray-700 font-medium mt-1 text-sm">Apple</Text>
-                </View>
-              </Pressable>
-              
-              <Pressable className="flex-1 bg-white border border-gray-200 rounded-xl p-4 ml-2 shadow-sm">
-                <View className="items-center">
-                  <Ionicons name="logo-facebook" size={24} color="#2563eb" />
-                  <Text className="text-gray-700 font-medium mt-1 text-sm">Facebook</Text>
-                </View>
-              </Pressable>
+              <Text style={styles.demoText}>Demo Mode: Any credentials work</Text>
             </View>
 
             {/* Sign Up Link */}
-            <View className="items-center">
-              <Text className="text-gray-600 text-base">
-                Don't have an account?{" "}
-                <Text className="text-green-600 font-semibold underline">
-                  Sign Up
+            <View style={styles.footer}>
+              <TouchableOpacity onPress={() => alert('This is just a mock demo 😉')}>
+                <Text style={styles.signUpText}>
+                  Don’t have an account? <Text style={styles.signUpLink}>Sign Up</Text>
                 </Text>
-              </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Demo Hint */}
-            <View className="mt-8 p-4 bg-green-50 rounded-xl border border-green-200">
-              <Text className="text-green-800 text-center text-sm font-medium">
-                🎯 Demo: username "demo" / password "password"
-              </Text>
+            {/* Social Section */}
+            <View style={styles.socialSection}>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.orText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <View style={styles.socialButtons}>
+                <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#DB4437' }]}>
+                  <Text style={styles.socialText}>G</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#1877F2' }]}>
+                  <Text style={styles.socialText}>F</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#1DA1F2' }]}>
+                  <Text style={styles.socialText}>X</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.socialLabel}>Log in with your social media account</Text>
             </View>
           </Animated.View>
         </KeyboardAvoidingView>
       </ScrollView>
-    </Animated.View>
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 56,
+  },
+  logoCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  logoImage: {
+    width: 60,
+    height: 60,
+  },
+  appName: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  tagline: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '400',
+    fontStyle: 'italic',
+  },
+  formContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 32,
+    padding: 28,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  greeting: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    backgroundColor: '#f8fafc',
+    borderRadius: 26,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  inputWithIcon: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1e293b',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    shadowColor: '#10B981',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
+  },
+  loginButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.3,
+  },
+  forgotContainer: {
+    marginTop: 16,
+  },
+  forgotText: {
+    fontSize: 14,
+    color: '#10B981',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  demoText: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  footer: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  signUpText: {
+    fontSize: 15,
+    color: '#ffffff',
+  },
+  signUpLink: {
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  socialSection: {
+    marginTop: 32,
+    width: '100%',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  orText: {
+    color: '#ffffff',
+    marginHorizontal: 16,
+    fontSize: 14,
+  },
+  socialButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  socialButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
+  },
+  socialText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  socialLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 13,
+  },
+});
