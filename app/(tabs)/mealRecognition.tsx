@@ -2,17 +2,27 @@
 import { analyzeImageWithGemini, Meal } from "@/services/geminiService";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const ZW_COLORS = {
+  BACKGROUND: '#f8fcf8',
+  CARD: '#FFFFFF',
+  PRIMARY_ACCENT: '#2EB86E',
+  SECONDARY_ACCENT: '#FFB84D', // tüm turuncu renk buraya taşındı
+  TEXT_DARK: '#0F1724',
+  TEXT_MUTED: '#64748b',
+  BORDER: '#e2e8f0',
+};
 
 export default function MealRecognition() {
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -20,7 +30,6 @@ export default function MealRecognition() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
-  // Using CameraView type directly for better ref typing
   const cameraRef = useRef<CameraView>(null);
 
   const handleImageAnalysis = async (uri: string, mimeType?: string) => {
@@ -30,7 +39,7 @@ export default function MealRecognition() {
       const result = await analyzeImageWithGemini(uri, mimeType);
       setMealResult(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown analysis error occurred.";
+      const errorMessage = err instanceof Error ? err.message : "Analysis failed.";
       Alert.alert("Analysis Failed", errorMessage);
     } finally {
       setIsLoading(false);
@@ -40,7 +49,7 @@ export default function MealRecognition() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission Required", "Permission to access the gallery is required!");
+      Alert.alert("Permission Required", "Gallery access is required!");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -57,7 +66,7 @@ export default function MealRecognition() {
   const openCamera = async () => {
     const { granted } = await requestPermission();
     if (!granted) {
-      Alert.alert("Permission Required", "Camera permission is required!");
+      Alert.alert("Permission Required", "Camera access is required!");
       return;
     }
     setIsCameraActive(true);
@@ -65,11 +74,10 @@ export default function MealRecognition() {
 
   const capturePhoto = async () => {
     if (cameraRef.current) {
-      // takePictureAsync returns an object with a uri property
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       setIsCameraActive(false);
       setImageUri(photo.uri);
-      handleImageAnalysis(photo.uri, 'image/jpeg'); // Camera photos are JPEG
+      handleImageAnalysis(photo.uri, 'image/jpeg');
     }
   };
 
@@ -78,14 +86,14 @@ export default function MealRecognition() {
     setMealResult(null);
   };
 
-  // Camera View UI
+  // Camera View
   if (isCameraActive) {
     return (
       <View style={styles.cameraContainer}>
         <CameraView style={styles.camera} ref={cameraRef} facing="back" />
         <View style={styles.cameraControls}>
           <TouchableOpacity onPress={() => setIsCameraActive(false)} style={styles.cameraButton}>
-            <Text style={styles.buttonText}>Cancel</Text>
+            <Text style={styles.cameraButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={capturePhoto} style={styles.captureButton} />
         </View>
@@ -93,152 +101,160 @@ export default function MealRecognition() {
     );
   }
 
-  // Main UI
   return (
-    <LinearGradient colors={["#bbf7d0", "#86efac", "#4ade80"]} style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#166534" />
-          <Text style={styles.loadingText}>AI is analyzing your meal...</Text>
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color={ZW_COLORS.PRIMARY_ACCENT} />
+          <Text style={styles.infoText}>Analyzing your meal...</Text>
         </View>
       ) : imageUri && mealResult ? (
-        <View style={styles.resultContainer}>
-          <Image source={{ uri: imageUri }} style={styles.resultImage} />
-          <Text style={styles.mealNameText}>{mealResult.meal_name}</Text>
-          <Text style={styles.descriptionText}>{mealResult.description}</Text>
-          <View style={styles.nutrientsContainer}>
-            <Text style={styles.nutrientText}>🔥 Calories: {mealResult.calories}</Text>
-            <Text style={styles.nutrientText}>💪 Protein: {mealResult.protein_g} g</Text>
-            <Text style={styles.nutrientText}>🌾 Carbs: {mealResult.carbs_g} g</Text>
-            <Text style={styles.nutrientText}>🧈 Fat: {mealResult.fat_g} g</Text>
+        <View style={styles.centerBox}>
+          <Image source={{ uri: imageUri }} style={styles.image} />
+          <View style={styles.card}>
+            <Text style={styles.mealName}>{mealResult.meal_name}</Text>
+            <Text style={styles.description}>{mealResult.description}</Text>
+            <View style={styles.nutrients}>
+              <Text style={styles.nutrientText}>Calories: {mealResult.calories}</Text>
+              <Text style={styles.nutrientText}>Protein: {mealResult.protein_g} g</Text>
+              <Text style={styles.nutrientText}>Carbs: {mealResult.carbs_g} g</Text>
+              <Text style={styles.nutrientText}>Fat: {mealResult.fat_g} g</Text>
+            </View>
           </View>
           <TouchableOpacity onPress={resetState} style={styles.actionButton}>
             <Text style={styles.buttonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.initialContainer}>
-          <Text style={styles.titleText}>Meal Recognition 📸</Text>
-          <TouchableOpacity onPress={openCamera} style={styles.actionButton}>
-            <Text style={styles.buttonText}>Take Photo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={pickImage} style={styles.actionButton}>
-            <Text style={styles.buttonText}>Upload from Gallery</Text>
-          </TouchableOpacity>
+        <View style={styles.centerBox}>
+          <View style={styles.card}>
+            <Text style={styles.title}>Meal Recognition</Text>
+            <Text style={styles.infoText}>Upload a photo or take a picture to analyze your meal.</Text>
+            <TouchableOpacity onPress={openCamera} style={styles.actionButton}>
+              <Text style={styles.buttonText}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={pickImage} style={styles.actionButton}>
+              <Text style={styles.buttonText}>Upload from Gallery</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
-    </LinearGradient>
+    </ScrollView>
   );
 }
 
-// Styles are largely the same as before
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: ZW_COLORS.BACKGROUND,
+  },
+  centerBox: {
+    flex: 1,
     alignItems: 'center',
-    padding: 24,
+    justifyContent: 'center',
+    padding: 20,
   },
-  cameraContainer: {
-    flex: 1,
+  card: {
+    width: '100%',
+    backgroundColor: ZW_COLORS.CARD,
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: ZW_COLORS.TEXT_DARK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  camera: {
-    flex: 1,
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFB84D',
+    marginBottom: 10,
+    textAlign: 'center',
   },
+  infoText: {
+    fontSize: 16,
+    color: ZW_COLORS.TEXT_MUTED,
+    marginVertical: 10,
+    textAlign: 'center',
+  },
+  actionButton: {
+    backgroundColor: ZW_COLORS.SECONDARY_ACCENT,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  image: {
+    width: 250,
+    height: 250,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: ZW_COLORS.PRIMARY_ACCENT,
+  },
+  mealName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: ZW_COLORS.PRIMARY_ACCENT,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 16,
+    color: ZW_COLORS.TEXT_DARK,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  nutrients: {
+    borderTopWidth: 1,
+    borderTopColor: ZW_COLORS.BORDER,
+    paddingTop: 10,
+  },
+  nutrientText: {
+    fontSize: 14,
+    color: ZW_COLORS.TEXT_DARK,
+    marginBottom: 4,
+  },
+  cameraContainer: { flex: 1 },
+  camera: { flex: 1 },
   cameraControls: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 50,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'white',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: ZW_COLORS.CARD,
     borderWidth: 4,
-    borderColor: '#16a34a',
+    borderColor: ZW_COLORS.SECONDARY_ACCENT,
   },
   cameraButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 25,
   },
-  initialContainer: {
-    alignItems: 'center',
-  },
-  titleText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#14532d',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  actionButton: {
-    backgroundColor: '#16a34a',
-    borderRadius: 30,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    marginBottom: 16,
-    width: '80%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
+  cameraButtonText: {
+    color: '#fff',
     fontWeight: '600',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#14532d',
-    marginTop: 16,
-    fontSize: 18,
-  },
-  resultContainer: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  resultImage: {
-    width: 256,
-    height: 256,
-    borderRadius: 16,
-    marginBottom: 24,
-    borderWidth: 3,
-    borderColor: 'white',
-  },
-  mealNameText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#14532d',
-    marginBottom: 8,
-  },
-  descriptionText: {
-    color: '#14532d',
     fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-    paddingHorizontal: 10,
-  },
-  nutrientsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 12,
-    padding: 16,
-    width: '100%',
-    marginBottom: 24,
-  },
-  nutrientText: {
-    fontSize: 16,
-    color: '#14532d',
-    marginBottom: 8,
   },
 });

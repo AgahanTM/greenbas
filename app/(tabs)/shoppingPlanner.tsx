@@ -1,6 +1,4 @@
 // app/shoppingPlanner.tsx
-import { router, useLocalSearchParams } from 'expo-router';
-import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,6 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
+import { Check } from 'lucide-react-native';
 
 // --- Types
 type Ingredient = {
@@ -238,7 +239,7 @@ const ShoppingPlanner = () => {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.pageTitle}>
-            Shopping Planner {recipe_name ? `for ${decodeURIComponent(recipe_name)}` : ''}
+            Shopping Planner {recipe_name ? `for \n ${decodeURIComponent(recipe_name)}` : ''}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -276,6 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
+    marginTop: 40,
   },
   backIcon: {
     fontSize: 24,

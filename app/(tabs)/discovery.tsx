@@ -42,13 +42,18 @@ type Recipe = {
   recipe_ingredients?: RecipeIngredientRow[];
 };
 
+type Category = {
+  name: string;
+  image_url: string | null;
+};
+
 const FALLBACK_IMAGE = 'https://via.placeholder.com/150';
 
 const DiscoveryScreen = () => {
   const [username, setUsername] = useState('Guest');
   const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
@@ -62,7 +67,6 @@ const DiscoveryScreen = () => {
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 700, useNativeDriver: true }).start();
     fetchUserData();
-    fetchCategories();
     loadFeatured();
     loadRecipes('');
   }, []);
@@ -96,24 +100,30 @@ const DiscoveryScreen = () => {
   };
 
   // Fetch dynamic categories
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { data, error } = await supabase
-        .from('recipes')
-        .select('category_en')
-        .order('category_en');
-      if (error) throw new Error(`Categories fetch error: ${error.message}`);
-      const uniqueCategories = [...new Set(data.map((item) => item.category_en).filter(Boolean))] as string[];
-      console.log('Fetched Categories:', uniqueCategories);
-      setCategories(uniqueCategories);
-    } catch (error: any) {
-      setError(`Error fetching categories: ${error.message}`);
-      console.error('fetchCategories Error:', error);
-    } finally {
-      setLoading(false);
-    }
+  const computeCategories = (recs: Recipe[]) => {
+    // Map<categoryName, { images: string[] }>
+    const catMap = new Map<string, { images: string[] }>();
+    recs.forEach((r) => {
+      const cat = r.category_en;
+      if (cat) {
+        const existing = catMap.get(cat) || { images: [] };
+        // Only add if an image_url exists and isn't the fallback
+        if (r.image_url && r.image_url !== FALLBACK_IMAGE) {
+          // We only need one image, so just grab the first valid one
+          if (existing.images.length === 0) {
+            existing.images.push(r.image_url);
+          }
+        }
+        catMap.set(cat, existing);
+      }
+    });
+    const cats: Category[] = [];
+    catMap.forEach((value, key) => {
+      const image = value.images[0] || null; // Get the first image, or null
+      cats.push({ name: key, image_url: image });
+    });
+    setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+    console.log('Computed Categories:', cats);
   };
 
   // Helper to add signed URLs for images
@@ -203,6 +213,9 @@ const DiscoveryScreen = () => {
     const updatedRows = await addSignedUrls(rows);
     console.log('Fetched Recipes:', updatedRows);
     setRecipes(updatedRows);
+    if (!queryText || queryText.trim().length === 0) {
+        computeCategories(updatedRows);
+      }
   } catch (err: any) {
     console.error('loadRecipes Error:', err);
     setError(err?.message ?? 'Unable to load recipes');
@@ -230,7 +243,6 @@ const DiscoveryScreen = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchUserData();
-    fetchCategories();
     loadFeatured();
     loadRecipes(selectedCategory ?? '');
   };
@@ -254,62 +266,70 @@ const DiscoveryScreen = () => {
   };
 
   // Add ingredients to shopping planner
- const addToShoppingPlanner = (recipeId: string) => {
+ const addToShoppingPlanner = (recipe: Recipe) => {
   try {
-    console.log('Validating recipe_id:', recipeId);
-    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipeId);
-    if (!isValidUUID) {
-      throw new Error(`Invalid recipe_id format: ${recipeId}`);
+    const ingredients = safeGetIngredients(recipe);
+    console.log('Navigating to shoppingPlanner with ingredients:', ingredients);
+    if (ingredients.length === 0) {
+      console.warn('No ingredients available for recipe:', recipe.name_en);
+      setError('No ingredients available for this recipe.');
+      return;
     }
-    console.log('Navigating to shoppingPlanner with recipe_id:', recipeId);
-    router.push(`/shoppingPlanner?recipe_id=${encodeURIComponent(recipeId)}`);
+    // Serialize ingredients to JSON and encode for URL
+    const ingredientsParam = encodeURIComponent(JSON.stringify(ingredients));
+    router.push(`/shoppingPlanner?ingredients=${ingredientsParam}&recipe_name=${encodeURIComponent(recipe.name_en || 'Untitled Recipe')}`);
     setModalVisible(false);
   } catch (e) {
     console.error('addToShoppingPlanner failed:', e);
-    setError(`Failed to navigate to shopping planner: ${e.message}`);
+    setError('Failed to navigate to shopping planner');
   }
 };
 
   // Renderers
-  const renderCategory = useCallback(
-    ({ item }: { item: string }) => (
+ const renderCategory = useCallback(
+    ({ item }: { item: Category }) => ( // item is now Category
       <TouchableOpacity
-        style={[styles.categoryCard, selectedCategory === item && styles.categoryCardSelected]}
-        onPress={() => handleCategorySelect(item)}
+        style={[styles.categoryCard, selectedCategory === item.name && styles.categoryCardSelected]}
+        onPress={() => handleCategorySelect(item.name)}
       >
-        <Text style={styles.categoryTitle}>{item}</Text>
+        {/* ADD THE IMAGE */}
+        <Image
+          source={{ uri: item.image_url || FALLBACK_IMAGE }}
+          style={styles.categoryImage}
+        />
+        <Text style={styles.categoryTitle}>{item.name}</Text>
       </TouchableOpacity>
     ),
     [selectedCategory]
   );
 
   const renderRecipe = useCallback(
-    ({ item }: { item: Recipe }) => (
-      <Animated.View style={{ opacity: fadeAnim }}>
-        <TouchableOpacity style={styles.recipeCard} onPress={() => showRecipeDetails(item)}>
-          <Image source={{ uri: item.image_url ?? FALLBACK_IMAGE }} style={styles.recipeImage} resizeMode="cover" />
-          <View style={styles.recipeInfo}>
-            <Text style={styles.recipeTitle}>{item.name_en || 'Untitled Recipe'}</Text>
-            <Text style={styles.recipeTags}>{(item.tags || []).join(' - ') || 'No tags'}</Text>
-            <View style={styles.recipeMeta}>
-              <Text style={styles.recipeMetaText}>⭐ {item.difficulty || 'N/A'}</Text>
-              <Text style={styles.recipeMetaText}> | </Text>
-              <Text style={styles.recipeMetaText}>
-                ⏱️ {item.prep_time_minutes ? `${item.prep_time_minutes} min` : 'N/A'}
-              </Text>
-              <TouchableOpacity
-  style={styles.addToPlannerButton}
-  onPress={() => addToShoppingPlanner(item.id)}
->
-  <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
-</TouchableOpacity>
-            </View>
+  ({ item }: { item: Recipe }) => (
+    <Animated.View style={{ opacity: fadeAnim }}>
+      <TouchableOpacity style={styles.recipeCard} onPress={() => showRecipeDetails(item)}>
+        <Image source={{ uri: item.image_url ?? FALLBACK_IMAGE }} style={styles.recipeImage} resizeMode="cover" />
+        <View style={styles.recipeInfo}>
+          <Text style={styles.recipeTitle}>{item.name_en || 'Untitled Recipe'}</Text>
+          <Text style={styles.recipeTags}>{(item.tags || []).join(' - ') || 'No tags'}</Text>
+          <View style={styles.recipeMeta}>
+            <Text style={styles.recipeMetaText}>⭐ {item.difficulty || 'N/A'}</Text>
+            <Text style={styles.recipeMetaText}> | </Text>
+            <Text style={styles.recipeMetaText}>
+              ⏱️ {item.prep_time_minutes ? `${item.prep_time_minutes} min` : 'N/A'}
+            </Text>
+            <TouchableOpacity
+              style={styles.addToPlannerButton}
+              onPress={() => addToShoppingPlanner(item)} // Pass full recipe
+            >
+              <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </Animated.View>
-    ),
-    []
-  );
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  ),
+  [fadeAnim]
+);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -358,7 +378,7 @@ const DiscoveryScreen = () => {
           <FlatList
             data={categories}
             renderItem={renderCategory}
-            keyExtractor={(item) => item}
+            keyExtractor={(item) => item.name}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingLeft: 20 }}
@@ -391,60 +411,60 @@ const DiscoveryScreen = () => {
       </ScrollView>
 
       <Modal
-        visible={modalVisible}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          {selectedRecipe && (
-            <>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-                <Text style={styles.closeButtonText}>Close</Text>
-              </TouchableOpacity>
-              <ScrollView>
-                <Image
-                  source={{ uri: selectedRecipe.image_url ?? FALLBACK_IMAGE }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                />
-                <Text style={styles.modalTitle}>{selectedRecipe.name_en || 'Untitled Recipe'}</Text>
-                <Text style={styles.modalSectionTitle}>Description</Text>
-                <Text style={styles.modalText}>{selectedRecipe.description_en ?? 'No description provided.'}</Text>
-                <Text style={styles.modalSectionTitle}>Ingredients</Text>
-                {safeGetIngredients(selectedRecipe).map((ing, idx) => (
-                  <Text key={idx} style={styles.modalText}>
-                    • {ing.quantity} {ing.unit} {ing.name}
-                  </Text>
-                ))}
-                <Text style={styles.modalSectionTitle}>Instructions</Text>
-                {(selectedRecipe.instructions_en || []).map((s) => (
-                  <Text key={s.step} style={styles.modalText}>
-                    {s.step}. {s.text}
-                  </Text>
-                ))}
-                <Text style={styles.modalSectionTitle}>Details</Text>
-                <Text style={styles.modalText}>
-                  Prep: {selectedRecipe.prep_time_minutes ?? '-'} minutes
-                </Text>
-                <Text style={styles.modalText}>
-                  Cook: {selectedRecipe.cook_time_minutes ?? '-'} minutes
-                </Text>
-                <Text style={styles.modalText}>Serves: {selectedRecipe.servings ?? '-'}</Text>
-                <Text style={styles.modalText}>Difficulty: {selectedRecipe.difficulty ?? 'N/A'}</Text>
-                <Text style={styles.modalText}>
-                  Tags: {(selectedRecipe.tags || []).join(', ') || 'None'}
-                </Text>
-                <TouchableOpacity
-  style={styles.addToPlannerButton}
-  onPress={() => addToShoppingPlanner(selectedRecipe.id)}
+  visible={modalVisible}
+  animationType="slide"
+  onRequestClose={() => setModalVisible(false)}
 >
-  <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
-</TouchableOpacity>
-              </ScrollView>
-            </>
-          )}
-        </SafeAreaView>
-      </Modal>
+  <SafeAreaView style={styles.modalContainer}>
+    {selectedRecipe && (
+      <>
+        <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+          <Text style={styles.closeButtonText}>Close</Text>
+        </TouchableOpacity>
+        <ScrollView>
+          <Image
+            source={{ uri: selectedRecipe.image_url ?? FALLBACK_IMAGE }}
+            style={styles.modalImage}
+            resizeMode="cover"
+          />
+          <Text style={styles.modalTitle}>{selectedRecipe.name_en || 'Untitled Recipe'}</Text>
+          <Text style={styles.modalSectionTitle}>Description</Text>
+          <Text style={styles.modalText}>{selectedRecipe.description_en ?? 'No description provided.'}</Text>
+          <Text style={styles.modalSectionTitle}>Ingredients</Text>
+          {safeGetIngredients(selectedRecipe).map((ing, idx) => (
+            <Text key={idx} style={styles.modalText}>
+              • {ing.quantity} {ing.unit} {ing.name}
+            </Text>
+          ))}
+          <Text style={styles.modalSectionTitle}>Instructions</Text>
+          {(selectedRecipe.instructions_en || []).map((s) => (
+            <Text key={s.step} style={styles.modalText}>
+              {s.step}. {s.text}
+            </Text>
+          ))}
+          <Text style={styles.modalSectionTitle}>Details</Text>
+          <Text style={styles.modalText}>
+            Prep: {selectedRecipe.prep_time_minutes ?? '-'} minutes
+          </Text>
+          <Text style={styles.modalText}>
+            Cook: {selectedRecipe.cook_time_minutes ?? '-'} minutes
+          </Text>
+          <Text style={styles.modalText}>Serves: {selectedRecipe.servings ?? '-'}</Text>
+          <Text style={styles.modalText}>Difficulty: {selectedRecipe.difficulty ?? 'N/A'}</Text>
+          <Text style={styles.modalText}>
+            Tags: {(selectedRecipe.tags || []).join(', ') || 'None'}
+          </Text>
+          <TouchableOpacity
+            style={styles.addToPlannerButton}
+            onPress={() => addToShoppingPlanner(selectedRecipe)} // Pass full recipe
+          >
+            <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </>
+    )}
+  </SafeAreaView>
+</Modal>
     </SafeAreaView>
   );
 };

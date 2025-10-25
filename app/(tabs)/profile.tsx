@@ -23,11 +23,11 @@ interface Profile {
   updated_at: string | null;
 }
 
-// Renk kodları tanımlanıyor
+// Renk kodları
 const COLORS = {
   BACKGROUND: '#F7FCF8',
-  CARD: '#FFFFFF',
-  TEXT: '#0F1724',
+  CARD: '#000000ff',
+  TEXT: '#ffffffff',
   ACCENT: '#FFB84D',
 };
 
@@ -47,21 +47,17 @@ export default function ProfileScreen() {
   });
   const [newPassword, setNewPassword] = useState('');
   const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
-
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Fetch profile on mount
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
         setError(null);
-        // Oturum açmış kullanıcıyı al
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) throw new Error('No user logged in');
         setUserId(user.id);
 
-        // Kullanıcının profil bilgilerini çek
         const { data, error } = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url, app_mode, updated_at')
@@ -106,8 +102,7 @@ export default function ProfileScreen() {
       setIsChangingPassword(false);
       setNewPassword('');
       Alert.alert('Success', 'Password updated successfully! Please log in again.');
-      // Şifre değişiminden sonra kullanıcıyı çıkış yapmaya zorla (güvenlik için)
-      await handleLogout(); 
+      await handleLogout();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update password');
     } finally {
@@ -119,47 +114,13 @@ export default function ProfileScreen() {
     Alert.alert('Support', 'Need help? Contact us at agahanyazmyradov.vercel.app');
   };
 
-  const uploadAvatar = async (uri: string) => {
-    if (!userId) return null;
-    try {
-      // Dosya adını ve yolunu oluştur
-      const fileExt = uri.split('.').pop();
-      const fileName = `${userId}_avatar.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      // Resmi blob olarak oku
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      // Supabase Storage'a yükle
-      const { data, error } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, blob, { upsert: true });
-
-      if (error) throw error;
-
-      // Halka açık URL'i al
-      const { data: publicURL } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      return publicURL.publicUrl;
-    } catch (error: any) {
-      console.error('Avatar upload error:', error.message);
-      Alert.alert('Error', 'Failed to upload avatar');
-      return null;
-    }
-  };
-
   const handleSaveProfile = async () => {
     try {
       setLoading(true);
-      let avatar_url = editedProfile.avatar_url;
 
-      // Eğer avatar URL'si yerel bir dosya ise, Supabase Storage'a yükle
-      if (avatar_url && avatar_url.startsWith('file://')) {
-        const uploadedUrl = await uploadAvatar(avatar_url);
-        if (uploadedUrl) avatar_url = uploadedUrl;
-      }
+      // avatar_url artık sadece local URI
+      const avatar_url = editedProfile.avatar_url;
 
-      // Profili güncelle
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -172,7 +133,6 @@ export default function ProfileScreen() {
 
       if (error) throw error;
 
-      // Başarılı güncelleme sonrası state'i yenile
       setProfile({ ...editedProfile, avatar_url });
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -185,7 +145,6 @@ export default function ProfileScreen() {
 
   const pickImage = async (fromCamera: boolean) => {
     try {
-      // İzinleri kontrol et
       const permission = fromCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -195,12 +154,10 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Resim seçimi veya çekimi
       const result = fromCamera
         ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1] })
         : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1] });
 
-      // Seçilen resmi düzenleme state'ine kaydet
       if (!result.canceled) {
         setEditedProfile({ ...editedProfile, avatar_url: result.assets[0].uri });
       }
@@ -244,18 +201,17 @@ export default function ProfileScreen() {
             source={{ uri: 'https://via.placeholder.com/150x50?text=LOGO' }}
             style={styles.logo}
             resizeMode="contain"
-            />
-
+          />
           <TouchableOpacity onPress={() => setIsAvatarModalVisible(true)}>
             <Image
               source={{ uri: editedProfile?.avatar_url || 'https://via.placeholder.com/120' }}
               style={styles.avatar}
-              />
-            </TouchableOpacity>
-            <Text style={styles.nameText}>{profile?.full_name || 'User'}</Text>
-            <Text style={styles.usernameText}>@{profile?.username || 'No username'}</Text>
-            <Text style={styles.detailText}>App Mode: {profile?.app_mode || 'Default'}</Text>
-            <Text style={styles.detailText}>Updated: {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}</Text>
+            />
+          </TouchableOpacity>
+          <Text style={styles.nameText}>{profile?.full_name || 'User'}</Text>
+          <Text style={styles.usernameText}>@{profile?.username || 'No username'}</Text>
+          <Text style={styles.detailText}>App Mode: {profile?.app_mode || 'Default'}</Text>
+          <Text style={styles.detailText}>Updated: {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}</Text>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -274,7 +230,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Edit Form (Inline for simpler visibility) */}
       {isEditing && (
         <View style={styles.editCard}>
           <Text style={styles.editTitle}>Edit Profile</Text>
@@ -338,14 +293,17 @@ export default function ProfileScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Avatar</Text>
-            <TouchableOpacity style={styles.modalButton} onPress={() => pickImage(true)}>
-              <Text style={styles.buttonText}>Take Photo</Text>
+            
+            <TouchableOpacity style={styles.avatarModalButton} onPress={() => pickImage(true)}>
+              <Text style={styles.avatarModalButtonText}>Take Photo</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modalButton} onPress={() => pickImage(false)}>
-              <Text style={styles.buttonText}>Choose from Library</Text>
+
+            <TouchableOpacity style={styles.avatarModalButton} onPress={() => pickImage(false)}>
+              <Text style={styles.avatarModalButtonText}>Choose from Library</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalButton, { backgroundColor: COLORS.TEXT, marginTop: 10 }]} onPress={() => setIsAvatarModalVisible(false)}>
-              <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Cancel</Text>
+
+            <TouchableOpacity style={[styles.avatarModalButton, { backgroundColor: COLORS.TEXT }]} onPress={() => setIsAvatarModalVisible(false)}>
+              <Text style={[styles.avatarModalButtonText, { color: COLORS.CARD }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -355,131 +313,38 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Genel Stil - Arkaplan Rengi: F7FCF8
   container: { flex: 1, backgroundColor: COLORS.BACKGROUND, padding: 16 },
-
-  // Başlık Stilleri - Metin Rengi: 0F1724
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  menuIcon: { fontSize: 24, color: COLORS.TEXT, fontWeight: 'bold' },
-  welcomeText: { fontSize: 20, fontWeight: 'bold', color: COLORS.TEXT },
-  
-  // Profil Kartı - Kart Rengi: FFFFFF
-  profileCard: { 
-    backgroundColor: COLORS.CARD, 
-    borderRadius: 16, 
-    padding: 20, 
-    shadowColor: COLORS.TEXT, 
-    shadowOffset: { width: 0, height: 4 }, // Gölge biraz daha belirgin yapıldı
-    shadowOpacity: 0.15, 
-    shadowRadius: 8, 
-    elevation: 8, 
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
     marginBottom: 20,
-    justifyContent: 'space-between',
-    minHeight: 550,
-    borderWidth: 1, // Hafif kenarlık eklendi
-    borderColor: '#e2e8f0',
+    marginTop: 40,
   },
-  
-  // Avatar ve Metin Stilleri
+  menuIcon: { fontSize: 24, color: 'black', fontWeight: 'bold' },
+  welcomeText: { fontSize: 20, fontWeight: 'bold', color: 'black' },
+  profileCard: { backgroundColor: 'white', borderRadius: 16, padding: 20, shadowColor: 'black', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 8, marginBottom: 20, justifyContent: 'space-between', minHeight: 550, borderWidth: 1, borderColor: '#e2e8f0' },
   logo: { width: 150, height: 50, marginBottom: 15 },
-  avatar: { 
-    width: 120, 
-    height: 120, 
-    borderRadius: 60, 
-    borderWidth: 4, 
-    borderColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
-    marginBottom: 15,
-  },
-  nameText: { fontSize: 24, fontWeight: '900', color: COLORS.TEXT, marginBottom: 5 }, // Metin Rengi: 0F1724
-  usernameText: { fontSize: 16, color: COLORS.ACCENT, marginBottom: 10, fontWeight: '600' }, // Vurgu rengi: FFB84D
-  detailText: { fontSize: 14, color: COLORS.TEXT, marginTop: 2, opacity: 0.7 }, // Metin Rengi: 0F1724 (Hafif şeffaflık)
-  
-  // Aksiyon Butonları - Arkaplan Rengi: FFB84D, Metin Rengi: 0F1724
+  avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: COLORS.ACCENT, marginBottom: 15 },
+  nameText: { fontSize: 24, fontWeight: '900', color: 'black', marginBottom: 5 },
+  usernameText: { fontSize: 16, color: COLORS.ACCENT, marginBottom: 10, fontWeight: '600' },
+  detailText: { fontSize: 14, color: 'black', marginTop: 2, opacity: 0.7 },
   buttonContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 15 },
-  actionButton: { 
-    paddingVertical: 12, 
-    paddingHorizontal: 20, 
-    borderRadius: 30, 
-    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
-    margin: 5, 
-    shadowColor: COLORS.ACCENT, 
-    shadowOffset: { width: 0, height: 3 }, 
-    shadowOpacity: 0.4, 
-    shadowRadius: 5, 
-    elevation: 5, 
-  },
-  buttonText: { color: COLORS.TEXT, fontWeight: '700', textAlign: 'center' }, // Metin Rengi: 0F1724
-
-  // Düzenleme Kartı ve Giriş Alanları
-  editCard: { 
-    padding: 20, 
-    marginBottom: 20,
-    borderRadius: 12,
-    backgroundColor: COLORS.CARD,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  editTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.TEXT, marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 10 }, // Metin Rengi: 0F1724
-  input: { 
-    borderWidth: 1, 
-    borderColor: '#e2e8f0', 
-    borderRadius: 12, 
-    padding: 14, 
-    marginBottom: 15, 
-    fontSize: 16, 
-    backgroundColor: COLORS.BACKGROUND, 
-    color: COLORS.TEXT 
-  },
-  
-  // Kaydet Butonu - Arkaplan Rengi: FFB84D
-  saveButton: { 
-    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
-    borderRadius: 30, 
-    paddingVertical: 14, 
-    shadowColor: COLORS.ACCENT, 
-    shadowOffset: { width: 0, height: 3 }, 
-    shadowOpacity: 0.4, 
-    shadowRadius: 5, 
-    elevation: 5, 
-  },
-  
-  // Modal Stilleri
+  actionButton: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 30, backgroundColor: COLORS.ACCENT, margin: 5, shadowColor: COLORS.ACCENT, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 5, elevation: 5 },
+  buttonText: { color: COLORS.TEXT, fontWeight: '700', textAlign: 'center' },
+  editCard: { padding: 20, marginBottom: 20, borderRadius: 12, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0' },
+  editTitle: { fontSize: 18, fontWeight: 'bold', color: 'black', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 10 },
+  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, marginBottom: 15, fontSize: 16, backgroundColor: COLORS.BACKGROUND, color: 'black' },
+  saveButton: { backgroundColor: COLORS.ACCENT, borderRadius: 30, paddingVertical: 14, shadowColor: COLORS.ACCENT, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 5, elevation: 5 },
   modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalContent: { 
-    width: '85%', 
-    backgroundColor: COLORS.CARD, 
-    padding: 25, 
-    borderRadius: 20, 
-    shadowColor: COLORS.TEXT, 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 5, 
-    elevation: 10,
-  },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.TEXT, marginBottom: 20, textAlign: 'center' }, // Metin Rengi: 0F1724
+  modalContent: { width: '85%', backgroundColor: 'white', padding: 25, borderRadius: 20, shadowColor: 'black', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 10 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: 'black', marginBottom: 20, textAlign: 'center' },
   modalButtonContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  modalButton: { 
-    flex: 1, 
-    paddingVertical: 14, 
-    marginRight: 10,
-    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
-    borderRadius: 30, 
-    shadowColor: COLORS.ACCENT, 
-    shadowOffset: { width: 0, height: 3 }, 
-    shadowOpacity: 0.4, 
-    shadowRadius: 5, 
-    elevation: 5, 
-    alignItems: 'center',
-  },
-  
-  // Yükleme/Hata Stilleri
-  loadingText: { fontSize: 18, color: COLORS.TEXT, marginTop: 10, fontWeight: '500' }, // Metin Rengi: 0F1724
-  errorText: { fontSize: 16, color: '#dc3545', fontWeight: 'bold' }, // Hata metni kırmızı kaldı
-  retryButton: { 
-    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
-    borderRadius: 30, 
-    padding: 12, 
-    marginTop: 15,
-    shadowColor: COLORS.ACCENT,
-  }
+  modalButton: { flex: 1, paddingVertical: 14, marginRight: 10, backgroundColor: COLORS.ACCENT, borderRadius: 30, shadowColor: COLORS.ACCENT, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 5, elevation: 5, alignItems: 'center' },
+  modalButtonText: { color: COLORS.TEXT, fontWeight: '700', textAlign: 'center', fontSize: 16 },
+  avatarModalButton: { backgroundColor: COLORS.ACCENT, borderRadius: 30, paddingVertical: 14, marginBottom: 12, alignItems: 'center', shadowColor: COLORS.ACCENT, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 5, elevation: 5 },
+  avatarModalButtonText: { color: COLORS.TEXT, fontWeight: '700', fontSize: 16 },
+  loadingText: { fontSize: 18, color: 'black', marginTop: 10, fontWeight: '500' },
+  errorText: { fontSize: 16, color: '#dc3545', fontWeight: 'bold' },
+  retryButton: { backgroundColor: COLORS.ACCENT, borderRadius: 30, padding: 12, marginTop: 15, shadowColor: COLORS.ACCENT }
 });
