@@ -1,4 +1,3 @@
-// app.config.js
 import 'dotenv/config';
 
 export default {
@@ -14,7 +13,7 @@ export default {
 
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.madara99.greenbas", // ✅ add unique bundle ID for iOS builds
+      bundleIdentifier: "com.madara99.greenbas"
     },
 
     android: {
@@ -22,16 +21,15 @@ export default {
         foregroundImage: "./assets/images/android-icon-foreground.png",
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
-        backgroundColor: "#E6F4FE",
+        backgroundColor: "#E6F4FE"
       },
-      edgeToEdge: true, // ✅ new name in SDK 52+ (`edgeToEdgeEnabled` deprecated)
-      package: "com.madara99.greenbas", // ✅ required for EAS builds
-      permissions: [], // optional but good practice
+      edgeToEdge: true,
+      package: "com.madara99.greenbas"
     },
 
     web: {
       output: "static",
-      favicon: "./assets/images/favicon.png",
+      favicon: "./assets/images/favicon.png"
     },
 
     plugins: [
@@ -43,33 +41,32 @@ export default {
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffff",
-          dark: {
-            backgroundColor: "#000000",
-          },
-        },
+          dark: { backgroundColor: "#000000" }
+        }
       ],
       [
         "expo-camera",
         {
-          cameraPermission: "Allow $(PRODUCT_NAME) to access your camera to scan meals.",
-        },
-      ],
+          cameraPermission: "Allow $(PRODUCT_NAME) to access your camera to scan meals."
+        }
+      ]
     ],
 
     experiments: {
       typedRoutes: true,
-      reactCompiler: true,
+      reactCompiler: true
     },
 
     extra: {
       eas: {
+        projectId: "6e2fa8da-a50b-40ed-a00f-1b0533276b14", // ✅ Added manually
         build: {
           experimental: {
-            env: true,
-          },
-        },
+            env: true
+          }
+        }
       },
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-    },
-  },
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY
+    }
+  }
 };
