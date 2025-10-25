@@ -1,4 +1,4 @@
-// services/geminiService.ts
+// --- MEVCUT KODUNUZ ---
 import Constants from 'expo-constants';
 import { File } from "expo-file-system";
 import { Alert } from "react-native";
@@ -94,5 +94,56 @@ export const analyzeImageWithGemini = async (uri: string, mimeType: string = "im
   } catch (error) {
     // Re-throw the error to be caught by the component
     throw error;
+  }
+};
+
+// --- YENİ EKLEME: ZeroWaste AI Önerisi ---
+const ZeroWastePrompt = (itemsList: string) => `
+You are a helpful zero-waste chef. Given these pantry items: (${itemsList}),
+produce 3 simple recipe ideas (title + 1-line instruction) and 3 quick tips to avoid food waste using these ingredients.
+Keep it short, actionable, and in Russian. Respond in plain text only.
+`;
+
+/**
+ * getMealSuggestions
+ * @param itemsList - "egg, tomato, cheese" gibi virgülle ayrılmış pantry öğeleri
+ * @returns Promise<string> - AI tarafından oluşturulan öneri metni
+ */
+export const getMealSuggestions = async (itemsList: string): Promise<string> => {
+  try {
+    const prompt = ZeroWastePrompt(itemsList);
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      const message = err?.error?.message || response.statusText || "Gemini API hatası";
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? data?.candidates?.[0]?.content ?? null;
+
+    if (!text) {
+      const alt = JSON.stringify(data).slice(0, 500);
+      throw new Error("Gemini'den uygun yanıt gelmedi: " + alt);
+    }
+
+    return String(text).trim();
+  } catch (error: any) {
+    console.error("getMealSuggestions error:", error);
+    throw new Error(error?.message || "Öneri alınamadı");
   }
 };

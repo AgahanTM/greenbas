@@ -1,659 +1,700 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../services/supabase';
+// app/(tabs)/discovery.tsx
+import { supabase } from '@/services/supabase';
+import { router } from 'expo-router';
+import { Search } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
-interface Recipe {
+// --- Types
+type InstructionStep = { step: number; text: string };
+type RecipeIngredientRow = {
+  quantity: number | string | null;
+  unit: string | null;
+  ingredients: { name_en: string } | null;
+};
+type Recipe = {
   id: string;
-  user_id: string;
   name_en: string;
-  name_tk: string;
-  description_en: string | null;
-  description_tk: string | null;
-  prep_time_minutes: number | null;
-  cook_time_minutes: number | null;
-  servings: number | null;
-  image_url: string | null;
-  category_en: string | null;
-  category_tk: string | null;
-  difficulty: string | null;
-  tags: string[] | null;
-  created_at: string;
-  profiles: { username: string | null } | null;
-}
+  description_en?: string;
+  image_url?: string | null;
+  prep_time_minutes?: number | null;
+  cook_time_minutes?: number | null;
+  servings?: number | null;
+  category_en?: string | null;
+  difficulty?: string | null;
+  tags?: string[] | null;
+  instructions_en?: InstructionStep[];
+  recipe_ingredients?: RecipeIngredientRow[];
+};
 
-interface Profile {
-  id: string;
-  username: string | null;
-  full_name: string | null;
-  app_mode: string | null;
-}
+const FALLBACK_IMAGE = 'https://via.placeholder.com/150';
 
-interface Category {
-  name: string;
-  image_url: string | null;
-  min_time: number | null;
-}
-
-interface Favorite {
-  id: string;
-  recipe_id: string;
-}
-
-const SkeletonRecipeCard: React.FC = () => (
-  <View style={styles.recipeCard}>
-    <View style={[styles.recipeImage, styles.skeletonImage]} />
-    <View style={styles.recipeInfo}>
-      <View style={[styles.skeletonText, { width: '80%', height: 18, marginBottom: 4 }]} />
-      <View style={[styles.skeletonText, { width: '100%', height: 14, marginBottom: 4 }]} />
-      <View style={[styles.skeletonText, { width: '60%', height: 14, marginBottom: 8 }]} />
-      <View style={styles.recipeMeta}>
-        <View style={[styles.skeletonText, { width: 60, height: 12 }]} />
-        <View style={[styles.skeletonText, { width: 60, height: 12 }]} />
-        <View style={[styles.skeletonText, { width: 60, height: 12 }]} />
-      </View>
-      <View style={[styles.skeletonText, { width: 80, height: 12, marginBottom: 4 }]} />
-      <View style={[styles.skeletonText, { width: 50, height: 12 }]} />
-    </View>
-  </View>
-);
-
-const Discovery: React.FC = () => {
-  const router = useRouter();
+const DiscoveryScreen = () => {
+  const [username, setUsername] = useState('Guest');
+  const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [greeting, setGreeting] = useState('Good Day!');
-  const [username, setUsername] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [lang, setLang] = useState<'en' | 'tk'>('en');
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [shoppingCount, setShoppingCount] = useState(0);
-  const perPage = 20;
+  const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchUserProfile();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 700, useNativeDriver: true }).start();
+    fetchUserData();
+    fetchCategories();
+    loadFeatured();
+    loadRecipes('');
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      fetchShoppingCount();
-      fetchRecommendedRecipes();
-      fetchFavorites();
-    }
-  }, [userId, page]);
-
-  const fetchUserProfile = async () => {
+  // Fetch user data
+  const fetchUserData = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        setError('Please sign in to view recipes.');
-        return;
+      if (authError) throw new Error(`Auth error: ${authError.message}`);
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+        if (profileError) throw new Error(`Profile fetch error: ${profileError.message}`);
+        console.log('Fetched Profile:', profile);
+        setUsername(profile?.username || 'Guest');
+      } else {
+        console.log('No user logged in, setting username to Guest');
+        setUsername('Guest');
       }
-
-      setUserId(user.id);
-
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('username, full_name, app_mode')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      const profile = profileData as Profile;
-      setUsername(profile.username || profile.full_name || 'User');
-      setLang((profile.app_mode as 'en' | 'tk') || 'en');
-
-      const hour = new Date().getHours();
-      if (hour < 12) setGreeting('Good Morning!');
-      else if (hour < 18) setGreeting('Good Afternoon!');
-      else setGreeting('Good Evening!');
-    } catch (err: any) {
-      setError('Failed to load user profile. Please try again.');
-      console.error('Error fetching user profile:', err.message || err);
-    }
-  };
-
-  const computeCategories = (recs: Recipe[]) => {
-    const catMap = new Map<string, { images: string[], times: number[] }>();
-    recs.forEach((r) => {
-      const cat = r[`category_${lang}` as keyof Recipe] as string;
-      if (cat) {
-        const existing = catMap.get(cat) || { images: [], times: [] };
-        if (r.image_url) existing.images.push(r.image_url);
-        const time = (r.prep_time_minutes || 0) + (r.cook_time_minutes || 0);
-        if (time > 0) existing.times.push(time);
-        catMap.set(cat, existing);
-      }
-    });
-    const cats: Category[] = [];
-    catMap.forEach((value, key) => {
-      const minTime = value.times.length > 0 ? Math.min(...value.times) : null;
-      const image = value.images[0] || null;
-      cats.push({ name: key, image_url: image, min_time: minTime });
-    });
-    setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
-  };
-
-  const fetchRecommendedRecipes = async () => {
-    try {
-      if (page === 1) setLoading(true);
-      else setLoadingMore(true);
-      const { data, error } = await supabase
-        .from('recipes')
-        .select('*, profiles!user_id (username)')
-        .order('created_at', { ascending: false })
-        .range((page - 1) * perPage, page * perPage - 1);
-
-      if (error) throw error;
-
-      const newRecipes = data || [];
-      setRecipes((prev) => (page === 1 ? newRecipes : [...prev, ...newRecipes]));
-      setFilteredRecipes((prev) => (page === 1 ? newRecipes : [...prev, ...newRecipes]));
-      computeCategories([...recipes, ...newRecipes]);
-    } catch (err: any) {
-      setError('Failed to load recipes. Please try again.');
-      console.error('Error fetching recipes:', err.message || err);
+    } catch (error: any) {
+      setError(`Error fetching user profile: ${error.message}`);
+      console.error('fetchUserData Error:', error);
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
-  const fetchFavorites = async () => {
+  // Fetch dynamic categories
+  const fetchCategories = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const { data, error } = await supabase
-        .from('user_favorite_recipes')
-        .select('recipe_id')
-        .eq('user_id', userId);
-
-      if (error) throw error;
-
-      setFavorites((data || []).map((f: Favorite) => f.recipe_id));
-    } catch (err: any) {
-      console.error('Error fetching favorites:', err.message || err);
+        .from('recipes')
+        .select('category_en')
+        .order('category_en');
+      if (error) throw new Error(`Categories fetch error: ${error.message}`);
+      const uniqueCategories = [...new Set(data.map((item) => item.category_en).filter(Boolean))] as string[];
+      console.log('Fetched Categories:', uniqueCategories);
+      setCategories(uniqueCategories);
+    } catch (error: any) {
+      setError(`Error fetching categories: ${error.message}`);
+      console.error('fetchCategories Error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchShoppingCount = async () => {
-    try {
-      const { count, error } = await supabase
-        .from('shopping_list_items')
-        .select('id', { count: 'exact' })
-        .eq('user_id', userId);
+  // Helper to add signed URLs for images
+  const addSignedUrls = useCallback(async (rows: Recipe[]) => {
+    return Promise.all(
+      rows.map(async (r) => {
+        const copy = { ...r } as Recipe;
+        try {
+          if (copy.image_url && copy.image_url.startsWith('recipes-images/')) {
+            const { data, error } = supabase.storage.from('recipes-images').getPublicUrl(copy.image_url);
+            if (error) {
+              console.warn('getPublicUrl error', error.message);
+            } else if (data?.publicUrl) {
+              copy.image_url = data.publicUrl;
+            }
+          }
+          if (!copy.image_url) {
+            copy.image_url = FALLBACK_IMAGE;
+          }
+        } catch (e) {
+          console.warn('addSignedUrls failed', e);
+          copy.image_url = FALLBACK_IMAGE;
+        }
+        return copy;
+      })
+    );
+  }, []);
 
-      if (error) throw error;
-
-      setShoppingCount(count || 0);
-    } catch (err: any) {
-      console.error('Error fetching shopping count:', err.message || err);
-    }
+  // Timeout wrapper for network requests
+  const fetchWithTimeout = async <T,>(promise: Promise<T>, timeout = 8000): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Request timed out')), timeout)),
+    ]) as Promise<T>;
   };
 
-  const toggleFavorite = async (recipeId: string) => {
-    try {
-      const isFavorited = favorites.includes(recipeId);
-      if (isFavorited) {
-        const { error } = await supabase
-          .from('user_favorite_recipes')
-          .delete()
-          .eq('user_id', userId)
-          .eq('recipe_id', recipeId);
+  // Load featured recipes
+  const loadFeatured = async () => {
+  setFeaturedLoading(true);
+  setError(null);
+  try {
+    const query = supabase
+      .from('recipes')
+      .select(
+        `id, name_en, description_en, image_url, prep_time_minutes, cook_time_minutes, servings, category_en, difficulty, tags, instructions_en, recipe_ingredients(quantity, unit, ingredients(name_en))`
+      )
+      .limit(6)
+      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(query);
+    if (error) throw error;
+    const rows = (data || []) as Recipe[];
+    console.log('Raw Featured Recipes:', rows); // Log raw data
+    const updatedRows = await addSignedUrls(rows);
+    console.log('Fetched Featured Recipes:', updatedRows);
+    setFeaturedRecipes(updatedRows);
+  } catch (err: any) {
+    console.error('loadFeatured Error:', err);
+    setError(err?.message ?? 'Unable to load featured recipes');
+  } finally {
+    setFeaturedLoading(false);
+  }
+};
 
-        if (error) throw error;
-        setFavorites((prev) => prev.filter((id) => id !== recipeId));
-      } else {
-        const { error } = await supabase
-          .from('user_favorite_recipes')
-          .insert({ user_id: userId, recipe_id: recipeId });
+  // Load recipes with search or category filter
+  const loadRecipes = async (queryText: string, limit = 30) => {
+  setLoading(true);
+  setError(null);
+  try {
+    let builder = supabase
+      .from('recipes')
+      .select(
+        `id, name_en, description_en, image_url, prep_time_minutes, cook_time_minutes, servings, category_en, difficulty, tags, instructions_en, recipe_ingredients(quantity, unit, ingredients(name_en))`
+      )
+      .limit(limit)
+      .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        setFavorites((prev) => [...prev, recipeId]);
-      }
-    } catch (err: any) {
-      console.error('Error toggling favorite:', err.message || err);
+    if (queryText && queryText.trim().length > 0) {
+      const q = queryText.trim();
+      const orExpr = `name_en.ilike.%${q}%,description_en.ilike.%${q}%,category_en.ilike.%${q}%`;
+      builder = builder.or(orExpr);
     }
-  };
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setPage(1);
-    await Promise.all([fetchRecommendedRecipes(), fetchFavorites(), fetchShoppingCount()]);
+    const { data, error } = await fetchWithTimeout(builder);
+    if (error) throw error;
+    const rows = (data || []) as Recipe[];
+    console.log('Raw Recipes:', rows); // Log raw data
+    const updatedRows = await addSignedUrls(rows);
+    console.log('Fetched Recipes:', updatedRows);
+    setRecipes(updatedRows);
+  } catch (err: any) {
+    console.error('loadRecipes Error:', err);
+    setError(err?.message ?? 'Unable to load recipes');
+  } finally {
+    setLoading(false);
     setRefreshing(false);
-  }, [userId]);
+  }
+};
 
-  const loadMore = useCallback(() => {
-    if (!loadingMore && recipes.length >= page * perPage) {
-      setPage((prev) => prev + 1);
-    }
-  }, [loadingMore, recipes.length, page, perPage]);
-
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    filterRecipes(text, selectedCategory);
+  // Handle search
+  const handleSearch = () => {
+    const q = searchQuery && searchQuery.trim().length > 0 ? searchQuery.trim() : selectedCategory ?? '';
+    loadRecipes(q);
   };
 
-  const handleCategorySelect = (category: string | null) => {
-    setSelectedCategory(category);
-    filterRecipes(searchQuery, category);
+  // Handle category selection
+  const handleCategorySelect = (category: string) => {
+    console.log('Category Selected:', category);
+    setSelectedCategory(category || null);
+    setSearchQuery('');
+    loadRecipes(category);
   };
 
-  const filterRecipes = (query: string, category: string | null) => {
-    let filtered = recipes;
-
-    if (category) {
-      filtered = filtered.filter((recipe) => recipe[`category_${lang}` as keyof Recipe] === category);
-    }
-
-    if (query) {
-      const lowerQuery = query.toLowerCase();
-      filtered = filtered.filter((recipe) =>
-        recipe[`name_${lang}` as keyof Recipe].toString().toLowerCase().includes(lowerQuery) ||
-        (recipe[`description_${lang}` as keyof Recipe] && recipe[`description_${lang}` as keyof Recipe]!.toString().toLowerCase().includes(lowerQuery))
-      );
-    }
-
-    setFilteredRecipes(filtered);
+  // Handle refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchUserData();
+    fetchCategories();
+    loadFeatured();
+    loadRecipes(selectedCategory ?? '');
   };
 
-  const renderCategoryItem = ({ item }: { item: Category }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryButton,
-        selectedCategory === item.name ? styles.selectedCategory : null,
-      ]}
-      onPress={() => handleCategorySelect(item.name === selectedCategory ? null : item.name)}
-    >
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={styles.categoryImage} />
-      ) : (
-        <View style={styles.categoryPlaceholder}>
-          <Text style={styles.placeholderText}>No Image</Text>
-        </View>
-      )}
-      <Text style={[
-        styles.categoryText,
-        selectedCategory === item.name ? styles.selectedCategoryText : null,
-      ]}>
-        {item.name}
-      </Text>
-      <Text style={styles.categorySubText}>
-        {item.min_time ? `Starting ${item.min_time} min` : ''}
-      </Text>
-    </TouchableOpacity>
+  // Show recipe details in modal
+  const showRecipeDetails = (recipe: Recipe) => {
+    console.log('Recipe Selected:', recipe.name_en);
+    setSelectedRecipe(recipe);
+    setModalVisible(true);
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  };
+
+  // Format ingredients for display and planner
+  const safeGetIngredients = (recipe: Recipe) => {
+    return (recipe.recipe_ingredients || []).map((ri) => ({
+      name: ri.ingredients?.name_en ?? 'Unknown',
+      quantity: ri.quantity ?? '-',
+      unit: ri.unit ?? '',
+    }));
+  };
+
+  // Add ingredients to shopping planner
+ const addToShoppingPlanner = (recipeId: string) => {
+  try {
+    console.log('Validating recipe_id:', recipeId);
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipeId);
+    if (!isValidUUID) {
+      throw new Error(`Invalid recipe_id format: ${recipeId}`);
+    }
+    console.log('Navigating to shoppingPlanner with recipe_id:', recipeId);
+    router.push(`/shoppingPlanner?recipe_id=${encodeURIComponent(recipeId)}`);
+    setModalVisible(false);
+  } catch (e) {
+    console.error('addToShoppingPlanner failed:', e);
+    setError(`Failed to navigate to shopping planner: ${e.message}`);
+  }
+};
+
+  // Renderers
+  const renderCategory = useCallback(
+    ({ item }: { item: string }) => (
+      <TouchableOpacity
+        style={[styles.categoryCard, selectedCategory === item && styles.categoryCardSelected]}
+        onPress={() => handleCategorySelect(item)}
+      >
+        <Text style={styles.categoryTitle}>{item}</Text>
+      </TouchableOpacity>
+    ),
+    [selectedCategory]
   );
 
-  const renderRecipeItem = ({ item }: { item: Recipe }) => {
-    const isFavorited = favorites.includes(item.id);
-    const totalTime = (item.prep_time_minutes || 0) + (item.cook_time_minutes || 0);
-    return (
-      <TouchableOpacity
-        style={styles.recipeCard}
-        onPress={() => router.push({ pathname: '/recipe-detail', params: { recipeId: item.id } })}
-      >
-        <TouchableOpacity style={styles.favoriteButton} onPress={() => toggleFavorite(item.id)}>
-          <Ionicons name={isFavorited ? 'heart' : 'heart-outline'} size={24} color={isFavorited ? 'red' : '#888'} />
+  const renderRecipe = useCallback(
+    ({ item }: { item: Recipe }) => (
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <TouchableOpacity style={styles.recipeCard} onPress={() => showRecipeDetails(item)}>
+          <Image source={{ uri: item.image_url ?? FALLBACK_IMAGE }} style={styles.recipeImage} resizeMode="cover" />
+          <View style={styles.recipeInfo}>
+            <Text style={styles.recipeTitle}>{item.name_en || 'Untitled Recipe'}</Text>
+            <Text style={styles.recipeTags}>{(item.tags || []).join(' - ') || 'No tags'}</Text>
+            <View style={styles.recipeMeta}>
+              <Text style={styles.recipeMetaText}>⭐ {item.difficulty || 'N/A'}</Text>
+              <Text style={styles.recipeMetaText}> | </Text>
+              <Text style={styles.recipeMetaText}>
+                ⏱️ {item.prep_time_minutes ? `${item.prep_time_minutes} min` : 'N/A'}
+              </Text>
+              <TouchableOpacity
+  style={styles.addToPlannerButton}
+  onPress={() => addToShoppingPlanner(item.id)}
+>
+  <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
+</TouchableOpacity>
+            </View>
+          </View>
         </TouchableOpacity>
-        {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={styles.recipeImage} />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No Image</Text>
-          </View>
-        )}
-        <View style={styles.recipeInfo}>
-          <Text style={styles.recipeName}>{item[`name_${lang}` as keyof Recipe] as string}</Text>
-          <Text style={styles.recipeDescription} numberOfLines={2}>
-            {item[`description_${lang}` as keyof Recipe] as string || 'No description available'}
-          </Text>
-          <View style={styles.recipeMeta}>
-            <View style={styles.metaItem}>
-              <Ionicons name="timer-outline" size={12} color="#888" />
-              <Text style={styles.metaText}>{item.prep_time_minutes || 'N/A'} min prep</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Ionicons name="timer-outline" size={12} color="#888" />
-              <Text style={styles.metaText}>{item.cook_time_minutes || 'N/A'} min cook</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Ionicons name="people-outline" size={12} color="#888" />
-              <Text style={styles.metaText}>Serves {item.servings || 'N/A'}</Text>
-            </View>
-          </View>
-          <View style={styles.recipeMeta}>
-            <Text style={styles.metaText}>Total: {totalTime || 'N/A'} min</Text>
-            <Text style={styles.metaText}>By {item.profiles?.username || 'Unknown'}</Text>
-          </View>
-          {item.difficulty && <Text style={styles.difficulty}>Difficulty: {item.difficulty}</Text>}
-          {item[`category_${lang}` as keyof Recipe] && <Text style={styles.categoryTag}>{item[`category_${lang}` as keyof Recipe] as string}</Text>}
-          {item.tags && item.tags.length > 0 && <Text style={styles.tagsText}>Tags: {item.tags.join(', ')}</Text>}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return <ActivityIndicator style={{ marginVertical: 20 }} />;
-  };
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+      </Animated.View>
+    ),
+    []
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hey {username}, {greeting}</Text>
-        <TouchableOpacity style={styles.cartButton} onPress={() => router.push('shoppingPlanner')}>
-          <Ionicons name="cart-outline" size={28} color="#333" />
-          {shoppingCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{shoppingCount}</Text></View>}
+        <TouchableOpacity>
+          <Text style={styles.iconText}>[=]</Text>
         </TouchableOpacity>
+        <View style={styles.headerTitle}>
+          <Text style={styles.headerSubtitle}>WELCOME</Text>
+          <Text style={styles.headerMainText}>{username} ▼</Text>
+        </View>
       </View>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search dishes, recipes..."
-        value={searchQuery}
-        onChangeText={handleSearch}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      {categories.length > 0 && (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>All Categories</Text>
-            <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
-          </View>
+
+      <View style={styles.staticContent}>
+        <Text style={styles.greeting}>Hey {username}, Good Afternoon!</Text>
+        <View style={styles.searchBar}>
+          <Search size={18} color="#708090" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search recipes, ingredients..."
+            placeholderTextColor="#708090"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            onSubmitEditing={handleSearch}
+          />
+        </View>
+      </View>
+
+      {loading && <Text style={styles.loadingText}>Loading...</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>All Categories</Text>
+          <TouchableOpacity onPress={() => handleCategorySelect('')}>
+            <Text style={styles.seeAll}>See All {'>'}</Text>
+          </TouchableOpacity>
+        </View>
+        {categories.length > 0 ? (
           <FlatList
             data={categories}
-            renderItem={renderCategoryItem}
-            keyExtractor={(item) => item.name}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryList}
+            contentContainerStyle={{ paddingLeft: 20 }}
           />
-        </>
-      )}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          {selectedCategory ? `${selectedCategory} Recipes` : 'Open Recipes'}
-        </Text>
-        <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
-      </View>
-      {loading ? (
-        <FlatList
-          data={Array.from({ length: 5 })}
-          renderItem={() => <SkeletonRecipeCard />}
-          keyExtractor={(_, index) => index.toString()}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FlatList
-          data={filteredRecipes}
-          renderItem={renderRecipeItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          ListEmptyComponent={<View style={styles.emptyContainer}><Text style={styles.emptyText}>No recipes found.</Text></View>}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-        />
-      )}
+        ) : (
+          <Text style={styles.noDataText}>No categories available</Text>
+        )}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {selectedCategory ? `Recipes in ${selectedCategory}` : 'Featured Recipes'}
+          </Text>
+          <TouchableOpacity onPress={() => handleCategorySelect('')}>
+            <Text style={styles.seeAll}>{selectedCategory ? 'Back to Featured >' : 'See All >'}</Text>
+          </TouchableOpacity>
+        </View>
+        {featuredLoading ? (
+          <ActivityIndicator size="large" color="#E8B923" style={{ marginVertical: 20 }} />
+        ) : (
+          <View style={styles.recipeList}>
+            {recipes.length > 0 ? (
+              recipes.map((item, index) => (
+                <React.Fragment key={item.id}>{renderRecipe({ item })}</React.Fragment>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No recipes available</Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          {selectedRecipe && (
+            <>
+              <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+              <ScrollView>
+                <Image
+                  source={{ uri: selectedRecipe.image_url ?? FALLBACK_IMAGE }}
+                  style={styles.modalImage}
+                  resizeMode="cover"
+                />
+                <Text style={styles.modalTitle}>{selectedRecipe.name_en || 'Untitled Recipe'}</Text>
+                <Text style={styles.modalSectionTitle}>Description</Text>
+                <Text style={styles.modalText}>{selectedRecipe.description_en ?? 'No description provided.'}</Text>
+                <Text style={styles.modalSectionTitle}>Ingredients</Text>
+                {safeGetIngredients(selectedRecipe).map((ing, idx) => (
+                  <Text key={idx} style={styles.modalText}>
+                    • {ing.quantity} {ing.unit} {ing.name}
+                  </Text>
+                ))}
+                <Text style={styles.modalSectionTitle}>Instructions</Text>
+                {(selectedRecipe.instructions_en || []).map((s) => (
+                  <Text key={s.step} style={styles.modalText}>
+                    {s.step}. {s.text}
+                  </Text>
+                ))}
+                <Text style={styles.modalSectionTitle}>Details</Text>
+                <Text style={styles.modalText}>
+                  Prep: {selectedRecipe.prep_time_minutes ?? '-'} minutes
+                </Text>
+                <Text style={styles.modalText}>
+                  Cook: {selectedRecipe.cook_time_minutes ?? '-'} minutes
+                </Text>
+                <Text style={styles.modalText}>Serves: {selectedRecipe.servings ?? '-'}</Text>
+                <Text style={styles.modalText}>Difficulty: {selectedRecipe.difficulty ?? 'N/A'}</Text>
+                <Text style={styles.modalText}>
+                  Tags: {(selectedRecipe.tags || []).join(', ') || 'None'}
+                </Text>
+                <TouchableOpacity
+  style={styles.addToPlannerButton}
+  onPress={() => addToShoppingPlanner(selectedRecipe.id)}
+>
+  <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
+</TouchableOpacity>
+              </ScrollView>
+            </>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
 
+export default DiscoveryScreen;
+
+// Styles (updated with new button styles and category card changes)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F8F8',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#F5FFFA', // Mint Cream
+    paddingTop: 30,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    paddingBottom: 10,
+    backgroundColor: '#F5FFFA', // Mint Cream
+  },
+  iconText: {
+    fontSize: 26,
+    color: '#004040', // Rich Black
+    fontWeight: '600',
+  },
+  headerTitle: {
+    alignItems: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#708090', // Slate Gray
+    fontWeight: '700',
+  },
+  headerMainText: {
+    fontSize: 18,
+    color: '#004040', // Rich Black
+    fontWeight: '800',
+  },
+  staticContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    backgroundColor: '#F5FFFA', // Mint Cream
   },
   greeting: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#004040', // Rich Black
+    marginVertical: 15,
   },
-  cartButton: {
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#FF9500',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
+  searchBar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
+  searchIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    color: '#708090', // Slate Gray
   },
   searchInput: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    flex: 1,
     fontSize: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    color: '#004040', // Rich Black
+    paddingVertical: 0,
+  },
+  loadingText: {
+    textAlign: 'center',
+    margin: 25,
+    fontSize: 16,
+    color: '#004040', // Rich Black
+    fontWeight: '500',
+  },
+  errorText: {
+    textAlign: 'center',
+    margin: 25,
+    fontSize: 16,
+    color: '#E8B923', // Hunyadi Yellow
+    fontWeight: '600',
+  },
+  noDataText: {
+    textAlign: 'center',
+    margin: 25,
+    fontSize: 16,
+    color: '#708090', // Slate Gray
+    fontWeight: '500',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingHorizontal: 20,
+    marginTop: 25,
+    marginBottom: 15,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#004040', // Rich Black
   },
   seeAll: {
-    fontSize: 14,
-    color: '#007AFF',
+    fontSize: 15,
+    color: '#E8B923', // Hunyadi Yellow
+    fontWeight: '600',
   },
-  categoryList: {
-    paddingHorizontal: 16,
-  },
-  categoryButton: {
+  categoryCard: {
+    width: 140,
+    height: 180,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    marginRight: 15,
+    padding: 15,
     alignItems: 'center',
-    marginRight: 16,
-    width: 80,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E8B923', // Hunyadi Yellow
   },
-  selectedCategory: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 4,
+  categoryCardSelected: {
+    borderWidth: 2,
+    borderColor: '#4CAF50', // Muted green
+    backgroundColor: '#F5FFFA', // Mint Cream
   },
   categoryImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginBottom: 12,
   },
-  categoryPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#EEE',
-    justifyContent: 'center',
-    alignItems: 'center',
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#004040', // Rich Black
+    textAlign: 'center',
   },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+  categorySubtitle: {
+    fontSize: 13,
+    color: '#708090', // Slate Gray
     marginTop: 4,
   },
-  selectedCategoryText: {
-    color: '#FFF',
-  },
-  categorySubText: {
-    fontSize: 12,
-    color: '#888',
-  },
-  listContainer: {
-    paddingBottom: 16,
+  recipeList: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   recipeCard: {
-    flexDirection: 'row',
     backgroundColor: '#FFF',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 12,
+    borderRadius: 20,
+    marginBottom: 20,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    position: 'relative',
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    zIndex: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    overflow: 'hidden',
   },
   recipeImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  skeletonImage: {
-    backgroundColor: '#E0E0E0',
-  },
-  placeholderImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    backgroundColor: '#EEE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  placeholderText: {
-    color: '#AAA',
-    fontSize: 12,
+    width: '100%',
+    height: 180,
   },
   recipeInfo: {
-    flex: 1,
+    padding: 15,
   },
-  recipeName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#222',
-    marginBottom: 4,
+  recipeTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#004040', // Rich Black
   },
-  recipeDescription: {
+  recipeTags: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    color: '#708090', // Slate Gray
+    marginTop: 6,
   },
   recipeMeta: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  metaItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    marginTop: 12,
   },
-  metaText: {
-    fontSize: 12,
-    color: '#888',
-    marginLeft: 4,
+  recipeMetaText: {
+    fontSize: 14,
+    color: '#708090', // Slate Gray
+    fontWeight: '600',
   },
-  difficulty: {
-    fontSize: 12,
-    color: '#888',
-    fontStyle: 'italic',
-    marginBottom: 4,
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#F5FFFA', // Mint Cream
+    padding: 20,
+    paddingTop: 30,
   },
-  categoryTag: {
-    fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '500',
-    marginBottom: 4,
+  closeButton: {
+    alignSelf: 'flex-end',
+    padding: 12,
   },
-  tagsText: {
-    fontSize: 12,
-    color: '#888',
+  closeButtonText: {
+    fontSize: 17,
+    color: '#E8B923', // Hunyadi Yellow
+    fontWeight: '700',
   },
-  errorText: {
+  modalImage: {
+    width: '100%',
+    height: 250,
+    borderRadius: 20,
+    marginBottom: 25,
+  },
+  modalTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#004040', // Rich Black
+    marginBottom: 25,
+  },
+  modalSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#004040', // Rich Black
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  modalText: {
     fontSize: 16,
-    color: 'red',
-    textAlign: 'center',
-    marginBottom: 16,
+    color: '#708090', // Slate Gray
+    marginBottom: 12,
+    lineHeight: 22,
   },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  addToPlannerButton: {
+    backgroundColor: '#4CAF50', // Muted green
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
   },
-  retryButtonText: {
+  addToPlannerButtonText: {
+    fontSize: 14,
     color: '#FFF',
     fontWeight: '600',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  skeletonText: {
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-  },
 });
-
-export default Discovery;

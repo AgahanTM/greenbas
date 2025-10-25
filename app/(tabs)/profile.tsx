@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -22,6 +23,14 @@ interface Profile {
   updated_at: string | null;
 }
 
+// Renk kodları tanımlanıyor
+const COLORS = {
+  BACKGROUND: '#F7FCF8',
+  CARD: '#FFFFFF',
+  TEXT: '#0F1724',
+  ACCENT: '#FFB84D',
+};
+
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,14 +48,20 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
 
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Fetch profile on mount
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
         setError(null);
+        // Oturum açmış kullanıcıyı al
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) throw new Error('No user found');
+        if (userError || !user) throw new Error('No user logged in');
+        setUserId(user.id);
 
+        // Kullanıcının profil bilgilerini çek
         const { data, error } = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url, app_mode, updated_at')
@@ -86,12 +101,13 @@ export default function ProfileScreen() {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       setIsChangingPassword(false);
       setNewPassword('');
       Alert.alert('Success', 'Password updated successfully! Please log in again.');
-      await handleLogout();
+      // Şifre değişiminden sonra kullanıcıyı çıkış yapmaya zorla (güvenlik için)
+      await handleLogout(); 
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update password');
     } finally {
@@ -103,22 +119,61 @@ export default function ProfileScreen() {
     Alert.alert('Support', 'Need help? Contact us at agahanyazmyradov.vercel.app');
   };
 
+  const uploadAvatar = async (uri: string) => {
+    if (!userId) return null;
+    try {
+      // Dosya adını ve yolunu oluştur
+      const fileExt = uri.split('.').pop();
+      const fileName = `${userId}_avatar.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Resmi blob olarak oku
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Supabase Storage'a yükle
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, blob, { upsert: true });
+
+      if (error) throw error;
+
+      // Halka açık URL'i al
+      const { data: publicURL } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      return publicURL.publicUrl;
+    } catch (error: any) {
+      console.error('Avatar upload error:', error.message);
+      Alert.alert('Error', 'Failed to upload avatar');
+      return null;
+    }
+  };
+
   const handleSaveProfile = async () => {
     try {
       setLoading(true);
+      let avatar_url = editedProfile.avatar_url;
+
+      // Eğer avatar URL'si yerel bir dosya ise, Supabase Storage'a yükle
+      if (avatar_url && avatar_url.startsWith('file://')) {
+        const uploadedUrl = await uploadAvatar(avatar_url);
+        if (uploadedUrl) avatar_url = uploadedUrl;
+      }
+
+      // Profili güncelle
       const { error } = await supabase
         .from('profiles')
         .update({
           username: editedProfile.username,
           full_name: editedProfile.full_name,
-          avatar_url: editedProfile.avatar_url,
+          avatar_url,
           app_mode: editedProfile.app_mode,
         })
-        .eq('id', (await supabase.auth.getUser()).data.user?.id)
-        .select();
+        .eq('id', userId);
 
       if (error) throw error;
-      setProfile(editedProfile);
+
+      // Başarılı güncelleme sonrası state'i yenile
+      setProfile({ ...editedProfile, avatar_url });
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error: any) {
@@ -128,48 +183,46 @@ export default function ProfileScreen() {
     }
   };
 
-  const openCamera = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted) {
-      const result = await ImagePicker.launchCameraAsync();
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+  const pickImage = async (fromCamera: boolean) => {
+    try {
+      // İzinleri kontrol et
+      const permission = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert('Permission', fromCamera ? 'Camera permission is required!' : 'Photo library permission is required!');
+        return;
+      }
+
+      // Resim seçimi veya çekimi
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1] })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1] });
+
+      // Seçilen resmi düzenleme state'ine kaydet
+      if (!result.canceled) {
         setEditedProfile({ ...editedProfile, avatar_url: result.assets[0].uri });
       }
-    } else {
-      Alert.alert('Permission', 'Camera permission is required!');
+    } catch (error: any) {
+      console.error('Image picker error:', error.message);
+    } finally {
+      setIsAvatarModalVisible(false);
     }
-    setIsAvatarModalVisible(false);
-  };
-
-  const openImageLibrary = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted) {
-      const result = await ImagePicker.launchImageLibraryAsync();
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setEditedProfile({ ...editedProfile, avatar_url: result.assets[0].uri });
-      }
-    } else {
-      Alert.alert('Permission', 'Photo library permission is required!');
-    }
-    setIsAvatarModalVisible(false);
-  };
-
-  const setAvatarFromUrl = (url: string) => {
-    setEditedProfile({ ...editedProfile, avatar_url: url });
-    setIsAvatarModalVisible(false);
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.text}>Loading...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.ACCENT} />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => setLoading(true)}>
           <Text style={styles.buttonText}>Retry</Text>
@@ -180,342 +233,253 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        {!isEditing ? (
-          <View style={styles.profileCard}>
-            <Image
-              source={{ uri: profile?.avatar_url || 'https://via.placeholder.com/100' }}
-              style={styles.profileImage}
-              resizeMode="cover"
-            />
-            <TouchableOpacity style={styles.cameraIcon} onPress={openCamera}>
-              <Text style={styles.cameraText}>📷</Text>
-            </TouchableOpacity>
-            <Text style={styles.profileTitle}>{profile?.full_name || 'User'}</Text>
-            <Text style={styles.profileSubtitle}>@{profile?.username || 'No username'}</Text>
-            <Text style={styles.profileDetail}>App Mode: {profile?.app_mode || 'Default'}</Text>
-            <Text style={styles.profileDetail}>Updated: {profile?.updated_at || 'N/A'}</Text>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.actionButton} onPress={() => setIsEditing(true)}>
-                <Text style={styles.buttonText}>Edit Profile</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => setIsChangingPassword(true)}>
-                <Text style={styles.buttonText}>Change Password</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={handleSupport}>
-                <Text style={styles.buttonText}>Support</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-                <Text style={styles.buttonText}>Sign Out</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.editCard}>
-            <TouchableOpacity style={styles.backButton} onPress={() => setIsEditing(false)}>
-              <Text style={styles.backText}>←</Text>
-            </TouchableOpacity>
-            <Text style={styles.editTitle}>Edit Profile</Text>
-            <TextInput
-              style={styles.input}
-              value={editedProfile.full_name || ''}
-              onChangeText={(text) => setEditedProfile({ ...editedProfile, full_name: text })}
-              placeholder="Full Name"
-            />
-            <TextInput
-              style={styles.input}
-              value={editedProfile.username || ''}
-              onChangeText={(text) => setEditedProfile({ ...editedProfile, username: text })}
-              placeholder="Username"
-            />
-            <TouchableOpacity
-              style={styles.input}
-              onPress={() => setIsAvatarModalVisible(true)}
-            >
-              <Text style={styles.inputText}>
-                {editedProfile.avatar_url ? 'Change Avatar' : 'Add Avatar'}
-              </Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.input}
-              value={editedProfile.app_mode || ''}
-              onChangeText={(text) => setEditedProfile({ ...editedProfile, app_mode: text })}
-              placeholder="App Mode"
-            />
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSaveProfile}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>{loading ? 'Saving...' : 'SAVE'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Şifre Değiştirme Modal'ı */}
-        <Modal
-          visible={isChangingPassword}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsChangingPassword(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Change Password</Text>
-              <TextInput
-                style={styles.input}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="New Password"
-                secureTextEntry={true}
-                autoCapitalize="none"
-              />
-              <View style={styles.modalButtonContainer}>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={handleChangePassword}
-                  disabled={loading}
-                >
-                  <Text style={styles.buttonText}>{loading ? 'Changing...' : 'Change'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setIsChangingPassword(false);
-                    setNewPassword('');
-                  }}
-                >
-                  <Text style={styles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Avatar Seçimi Modal'ı */}
-        <Modal
-          visible={isAvatarModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsAvatarModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Select Avatar Source</Text>
-              <TouchableOpacity style={styles.optionButton} onPress={openCamera}>
-                <Text style={styles.buttonText}>Take Photo with Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton} onPress={openImageLibrary}>
-                <Text style={styles.buttonText}>Choose from Files</Text>
-              </TouchableOpacity>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter URL"
-                onChangeText={setAvatarFromUrl}
-                onSubmitEditing={() => setIsAvatarModalVisible(false)}
-              />
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsAvatarModalVisible(false)}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+      <View style={styles.header}>
+        <Text style={styles.menuIcon}>☰</Text>
+        <Text style={styles.welcomeText}>WELCOME {profile?.username || 'Guest'}</Text>
       </View>
+
+      <View style={styles.profileCard}>
+        <View style={{ alignItems: 'center' }}>
+          <Image
+            source={{ uri: 'https://via.placeholder.com/150x50?text=LOGO' }}
+            style={styles.logo}
+            resizeMode="contain"
+            />
+
+          <TouchableOpacity onPress={() => setIsAvatarModalVisible(true)}>
+            <Image
+              source={{ uri: editedProfile?.avatar_url || 'https://via.placeholder.com/120' }}
+              style={styles.avatar}
+              />
+            </TouchableOpacity>
+            <Text style={styles.nameText}>{profile?.full_name || 'User'}</Text>
+            <Text style={styles.usernameText}>@{profile?.username || 'No username'}</Text>
+            <Text style={styles.detailText}>App Mode: {profile?.app_mode || 'Default'}</Text>
+            <Text style={styles.detailText}>Updated: {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}</Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setIsEditing(true)}>
+            <Text style={styles.buttonText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setIsChangingPassword(true)}>
+            <Text style={styles.buttonText}>Change Password</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={handleSupport}>
+            <Text style={styles.buttonText}>Support</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
+            <Text style={styles.buttonText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Edit Form (Inline for simpler visibility) */}
+      {isEditing && (
+        <View style={styles.editCard}>
+          <Text style={styles.editTitle}>Edit Profile</Text>
+          <TextInput
+            style={styles.input}
+            value={editedProfile.full_name || ''}
+            onChangeText={(text) => setEditedProfile({ ...editedProfile, full_name: text })}
+            placeholder="Full Name"
+            placeholderTextColor="#94a3b8" 
+          />
+          <TextInput
+            style={styles.input}
+            value={editedProfile.username || ''}
+            onChangeText={(text) => setEditedProfile({ ...editedProfile, username: text })}
+            placeholder="Username"
+            placeholderTextColor="#94a3b8" 
+          />
+          <TextInput
+            style={styles.input}
+            value={editedProfile.app_mode || ''}
+            onChangeText={(text) => setEditedProfile({ ...editedProfile, app_mode: text })}
+            placeholder="App Mode"
+            placeholderTextColor="#94a3b8" 
+          />
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
+            <Text style={styles.buttonText}>SAVE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.saveButton, { backgroundColor: COLORS.TEXT, marginTop: 10 }]} onPress={() => setIsEditing(false)}>
+            <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Password Modal */}
+      <Modal visible={isChangingPassword} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="New Password"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+            />
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleChangePassword}>
+                <Text style={styles.buttonText}>Change</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: COLORS.TEXT, marginLeft: 10 }]} onPress={() => setIsChangingPassword(false)}>
+                <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Avatar Modal */}
+      <Modal visible={isAvatarModalVisible} transparent={true} animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Avatar</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={() => pickImage(true)}>
+              <Text style={styles.buttonText}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton} onPress={() => pickImage(false)}>
+              <Text style={styles.buttonText}>Choose from Library</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.modalButton, { backgroundColor: COLORS.TEXT, marginTop: 10 }]} onPress={() => setIsAvatarModalVisible(false)}>
+              <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  inputText: {
-    color: '#4B5563',
-    textAlign: 'center',
-    paddingVertical: 10,
-  },
-  optionButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 9999,
-    marginBottom: 10,
-    alignItems: 'center',
-    width: '100%',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  content: {
-    padding: 20,
-  },
-  profileCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 15,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 15,
-  },
-  cameraIcon: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    backgroundColor: '#EF4444',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraText: {
-    color: '#FFF',
-    fontSize: 16,
-  },
-  profileTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 10,
-  },
-  profileSubtitle: {
-    fontSize: 18,
-    color: '#6B7280',
-    marginBottom: 15,
-  },
-  profileDetail: {
-    fontSize: 16,
-    color: '#4B5563',
-    marginBottom: 10,
-  },
-  buttonContainer: {
-    width: '100%',
-    marginTop: 20,
-  },
-  actionButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 9999,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  editCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 15,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-  },
-  backText: {
-    fontSize: 24,
-    color: '#1E293B',
-  },
-  editTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E293B',
+  // Genel Stil - Arkaplan Rengi: F7FCF8
+  container: { flex: 1, backgroundColor: COLORS.BACKGROUND, padding: 16 },
+
+  // Başlık Stilleri - Metin Rengi: 0F1724
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  menuIcon: { fontSize: 24, color: COLORS.TEXT, fontWeight: 'bold' },
+  welcomeText: { fontSize: 20, fontWeight: 'bold', color: COLORS.TEXT },
+  
+  // Profil Kartı - Kart Rengi: FFFFFF
+  profileCard: { 
+    backgroundColor: COLORS.CARD, 
+    borderRadius: 16, 
+    padding: 20, 
+    shadowColor: COLORS.TEXT, 
+    shadowOffset: { width: 0, height: 4 }, // Gölge biraz daha belirgin yapıldı
+    shadowOpacity: 0.15, 
+    shadowRadius: 8, 
+    elevation: 8, 
     marginBottom: 20,
-  },
-  input: {
-    width: '100%',
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  saveButton: {
-    backgroundColor: '#10B981',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 9999,
-    marginTop: 20,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderRadius: 15,
-    padding: 20,
-    width: '80%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 20,
-  },
-  modalButtonContainer: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
+    minHeight: 550,
+    borderWidth: 1, // Hafif kenarlık eklendi
+    borderColor: '#e2e8f0',
   },
-  modalButton: {
-    backgroundColor: '#10B981',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 9999,
-    marginTop: 20,
+  
+  // Avatar ve Metin Stilleri
+  logo: { width: 150, height: 50, marginBottom: 15 },
+  avatar: { 
+    width: 120, 
+    height: 120, 
+    borderRadius: 60, 
+    borderWidth: 4, 
+    borderColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
+    marginBottom: 15,
+  },
+  nameText: { fontSize: 24, fontWeight: '900', color: COLORS.TEXT, marginBottom: 5 }, // Metin Rengi: 0F1724
+  usernameText: { fontSize: 16, color: COLORS.ACCENT, marginBottom: 10, fontWeight: '600' }, // Vurgu rengi: FFB84D
+  detailText: { fontSize: 14, color: COLORS.TEXT, marginTop: 2, opacity: 0.7 }, // Metin Rengi: 0F1724 (Hafif şeffaflık)
+  
+  // Aksiyon Butonları - Arkaplan Rengi: FFB84D, Metin Rengi: 0F1724
+  buttonContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 15 },
+  actionButton: { 
+    paddingVertical: 12, 
+    paddingHorizontal: 20, 
+    borderRadius: 30, 
+    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
+    margin: 5, 
+    shadowColor: COLORS.ACCENT, 
+    shadowOffset: { width: 0, height: 3 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 5, 
+    elevation: 5, 
+  },
+  buttonText: { color: COLORS.TEXT, fontWeight: '700', textAlign: 'center' }, // Metin Rengi: 0F1724
+
+  // Düzenleme Kartı ve Giriş Alanları
+  editCard: { 
+    padding: 20, 
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: COLORS.CARD,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  editTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.TEXT, marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 10 }, // Metin Rengi: 0F1724
+  input: { 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    borderRadius: 12, 
+    padding: 14, 
+    marginBottom: 15, 
+    fontSize: 16, 
+    backgroundColor: COLORS.BACKGROUND, 
+    color: COLORS.TEXT 
+  },
+  
+  // Kaydet Butonu - Arkaplan Rengi: FFB84D
+  saveButton: { 
+    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
+    borderRadius: 30, 
+    paddingVertical: 14, 
+    shadowColor: COLORS.ACCENT, 
+    shadowOffset: { width: 0, height: 3 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 5, 
+    elevation: 5, 
+  },
+  
+  // Modal Stilleri
+  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalContent: { 
+    width: '85%', 
+    backgroundColor: COLORS.CARD, 
+    padding: 25, 
+    borderRadius: 20, 
+    shadowColor: COLORS.TEXT, 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 5, 
+    elevation: 10,
+  },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.TEXT, marginBottom: 20, textAlign: 'center' }, // Metin Rengi: 0F1724
+  modalButtonContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  modalButton: { 
+    flex: 1, 
+    paddingVertical: 14, 
+    marginRight: 10,
+    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
+    borderRadius: 30, 
+    shadowColor: COLORS.ACCENT, 
+    shadowOffset: { width: 0, height: 3 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 5, 
+    elevation: 5, 
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
   },
-  cancelButton: {
-    backgroundColor: '#EF4444',
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  retryButton: {
-    backgroundColor: '#007bff',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 9999,
-    marginTop: 16,
-  },
-  text: {
-    fontSize: 16,
-    color: '#000',
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: 'red',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
+  
+  // Yükleme/Hata Stilleri
+  loadingText: { fontSize: 18, color: COLORS.TEXT, marginTop: 10, fontWeight: '500' }, // Metin Rengi: 0F1724
+  errorText: { fontSize: 16, color: '#dc3545', fontWeight: 'bold' }, // Hata metni kırmızı kaldı
+  retryButton: { 
+    backgroundColor: COLORS.ACCENT, // Vurgu rengi: FFB84D
+    borderRadius: 30, 
+    padding: 12, 
+    marginTop: 15,
+    shadowColor: COLORS.ACCENT,
+  }
 });
