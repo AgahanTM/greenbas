@@ -21,7 +21,7 @@ export default {
         foregroundImage: "./assets/images/logo.png",
         backgroundImage: "./assets/images/logo.png",
         monochromeImage: "./assets/images/logo.png",
-        backgroundColor: "#a4ff9896",
+        backgroundColor: "#ffffff96",
       },
       edgeToEdge: true,
       package: "com.madara99.greenbas"
@@ -41,7 +41,7 @@ export default {
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffff",
-          dark: { backgroundColor: "#000000" }
+          dark: { backgroundColor: "#b3eeb1cb" }
         }
       ],
       [
