@@ -210,10 +210,3 @@ For questions and support, open an issue on GitHub: https://github.com/AgahanTM/
 
 - List libraries, people, tutorials, or resources that helped you build the project.
 - Icons and images credits.
-
----
-
-If you want, I can:
-- tailor this README with concrete instructions for the repository language(s) used (run a quick scan of the repo and insert exact commands),
-- create a LICENSE file,
-- or open a PR adding this README to the repository. Tell me which you'd like next.
