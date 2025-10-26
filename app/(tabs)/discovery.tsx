@@ -1,4 +1,3 @@
-// app/(tabs)/discovery.tsx
 import { supabase } from '@/services/supabase';
 import { router } from 'expo-router';
 import { Search } from 'lucide-react-native';
@@ -10,7 +9,6 @@ import {
   Image,
   Modal,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -19,26 +17,27 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // --- Types
 type InstructionStep = { step: number; text: string };
 type RecipeIngredientRow = {
   quantity: number | string | null;
   unit: string | null;
-  ingredients: { name_en: string } | null;
+  ingredients: { name_tk: string } | null;
 };
 type Recipe = {
   id: string;
-  name_en: string;
-  description_en?: string;
+  name_tk: string;
+  description_tk?: string;
   image_url?: string | null;
   prep_time_minutes?: number | null;
   cook_time_minutes?: number | null;
   servings?: number | null;
-  category_en?: string | null;
+  category_tk?: string | null;
   difficulty?: string | null;
   tags?: string[] | null;
-  instructions_en?: InstructionStep[];
+  instructions_tk?: InstructionStep[];
   recipe_ingredients?: RecipeIngredientRow[];
 };
 
@@ -47,7 +46,7 @@ type Category = {
   image_url: string | null;
 };
 
-const FALLBACK_IMAGE = 'https://via.placeholder.com/150';
+const FALLBACK_IMAGE = 'https://plus.unsplash.com/premium_photo-1671379086168-a5d018d583cf?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8ZnJ1aXR8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&q=60&w=500';
 
 const DiscoveryScreen = () => {
   const [username, setUsername] = useState('Guest');
@@ -86,10 +85,10 @@ const DiscoveryScreen = () => {
           .single();
         if (profileError) throw new Error(`Profile fetch error: ${profileError.message}`);
         console.log('Fetched Profile:', profile);
-        setUsername(profile?.username || 'Guest');
+        setUsername(profile?.username || 'Myhman');
       } else {
         console.log('No user logged in, setting username to Guest');
-        setUsername('Guest');
+        setUsername('Myhman');
       }
     } catch (error: any) {
       setError(`Error fetching user profile: ${error.message}`);
@@ -101,15 +100,12 @@ const DiscoveryScreen = () => {
 
   // Fetch dynamic categories
   const computeCategories = (recs: Recipe[]) => {
-    // Map<categoryName, { images: string[] }>
     const catMap = new Map<string, { images: string[] }>();
     recs.forEach((r) => {
-      const cat = r.category_en;
+      const cat = r.category_tk;
       if (cat) {
         const existing = catMap.get(cat) || { images: [] };
-        // Only add if an image_url exists and isn't the fallback
         if (r.image_url && r.image_url !== FALLBACK_IMAGE) {
-          // We only need one image, so just grab the first valid one
           if (existing.images.length === 0) {
             existing.images.push(r.image_url);
           }
@@ -119,7 +115,7 @@ const DiscoveryScreen = () => {
     });
     const cats: Category[] = [];
     catMap.forEach((value, key) => {
-      const image = value.images[0] || null; // Get the first image, or null
+      const image = value.images[0] || null;
       cats.push({ name: key, image_url: image });
     });
     setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
@@ -153,7 +149,7 @@ const DiscoveryScreen = () => {
   }, []);
 
   // Timeout wrapper for network requests
-  const fetchWithTimeout = async <T,>(promise: Promise<T>, timeout = 8000): Promise<T> => {
+  const fetchWithTimeout = async <T,>(promise: Promise<T>, timeout =10000): Promise<T> => {
     return Promise.race([
       promise,
       new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Request timed out')), timeout)),
@@ -168,14 +164,14 @@ const DiscoveryScreen = () => {
     const query = supabase
       .from('recipes')
       .select(
-        `id, name_en, description_en, image_url, prep_time_minutes, cook_time_minutes, servings, category_en, difficulty, tags, instructions_en, recipe_ingredients(quantity, unit, ingredients(name_en))`
+        `id, name_tk, description_tk, image_url, prep_time_minutes, cook_time_minutes, servings, category_tk, difficulty, tags, instructions_tk, recipe_ingredients(quantity, unit, ingredients(name_tk))`
       )
       .limit(6)
       .order('created_at', { ascending: false });
     const { data, error } = await fetchWithTimeout(query);
     if (error) throw error;
     const rows = (data || []) as Recipe[];
-    console.log('Raw Featured Recipes:', rows); // Log raw data
+    console.log('Raw Featured Recipes:', rows);
     const updatedRows = await addSignedUrls(rows);
     console.log('Fetched Featured Recipes:', updatedRows);
     setFeaturedRecipes(updatedRows);
@@ -195,14 +191,14 @@ const DiscoveryScreen = () => {
     let builder = supabase
       .from('recipes')
       .select(
-        `id, name_en, description_en, image_url, prep_time_minutes, cook_time_minutes, servings, category_en, difficulty, tags, instructions_en, recipe_ingredients(quantity, unit, ingredients(name_en))`
+        `id, name_tk, description_tk, image_url, prep_time_minutes, cook_time_minutes, servings, category_tk, difficulty, tags, instructions_tk, recipe_ingredients(quantity, unit, ingredients(name_tk))`
       )
       .limit(limit)
       .order('created_at', { ascending: false });
 
     if (queryText && queryText.trim().length > 0) {
       const q = queryText.trim();
-      const orExpr = `name_en.ilike.%${q}%,description_en.ilike.%${q}%,category_en.ilike.%${q}%`;
+      const orExpr = `name_tk.ilike.%${q}%,description_tk.ilike.%${q}%,category_tk.ilike.%${q}%`;
       builder = builder.or(orExpr);
     }
 
@@ -249,7 +245,7 @@ const DiscoveryScreen = () => {
 
   // Show recipe details in modal
   const showRecipeDetails = (recipe: Recipe) => {
-    console.log('Recipe Selected:', recipe.name_en);
+    console.log('Recipe Selected:', recipe.name_tk);
     setSelectedRecipe(recipe);
     setModalVisible(true);
     fadeAnim.setValue(0);
@@ -259,7 +255,7 @@ const DiscoveryScreen = () => {
   // Format ingredients for display and planner
   const safeGetIngredients = (recipe: Recipe) => {
     return (recipe.recipe_ingredients || []).map((ri) => ({
-      name: ri.ingredients?.name_en ?? 'Unknown',
+      name: ri.ingredients?.name_tk ?? 'Unknown',
       quantity: ri.quantity ?? '-',
       unit: ri.unit ?? '',
     }));
@@ -271,13 +267,13 @@ const DiscoveryScreen = () => {
     const ingredients = safeGetIngredients(recipe);
     console.log('Navigating to shoppingPlanner with ingredients:', ingredients);
     if (ingredients.length === 0) {
-      console.warn('No ingredients available for recipe:', recipe.name_en);
+      console.warn('No ingredients available for recipe:', recipe.name_tk);
       setError('No ingredients available for this recipe.');
       return;
     }
     // Serialize ingredients to JSON and encode for URL
     const ingredientsParam = encodeURIComponent(JSON.stringify(ingredients));
-    router.push(`/shoppingPlanner?ingredients=${ingredientsParam}&recipe_name=${encodeURIComponent(recipe.name_en || 'Untitled Recipe')}`);
+    router.push(`/shoppingPlanner?ingredients=${ingredientsParam}&recipe_name=${encodeURIComponent(recipe.name_tk || 'Untitled Recipe')}`);
     setModalVisible(false);
   } catch (e) {
     console.error('addToShoppingPlanner failed:', e);
@@ -309,7 +305,7 @@ const DiscoveryScreen = () => {
       <TouchableOpacity style={styles.recipeCard} onPress={() => showRecipeDetails(item)}>
         <Image source={{ uri: item.image_url ?? FALLBACK_IMAGE }} style={styles.recipeImage} resizeMode="cover" />
         <View style={styles.recipeInfo}>
-          <Text style={styles.recipeTitle}>{item.name_en || 'Untitled Recipe'}</Text>
+          <Text style={styles.recipeTitle}>{item.name_tk || 'Untitled Recipe'}</Text>
           <Text style={styles.recipeTags}>{(item.tags || []).join(' - ') || 'No tags'}</Text>
           <View style={styles.recipeMeta}>
             <Text style={styles.recipeMetaText}>⭐ {item.difficulty || 'N/A'}</Text>
@@ -321,7 +317,7 @@ const DiscoveryScreen = () => {
               style={styles.addToPlannerButton}
               onPress={() => addToShoppingPlanner(item)} // Pass full recipe
             >
-              <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
+              <Text style={styles.addToPlannerButtonText}>Sargamak plany</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -332,20 +328,24 @@ const DiscoveryScreen = () => {
 );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaProvider style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity>
-          <Text style={styles.iconText}>[=]</Text>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.logoIcon}
+          />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.headerSubtitle}>WELCOME</Text>
+          <Text style={styles.headerSubtitle}>Hosgeldin</Text>
           <Text style={styles.headerMainText}>{username} ▼</Text>
         </View>
+        
       </View>
 
       <View style={styles.staticContent}>
-        <Text style={styles.greeting}>Hey {username}, Good Afternoon!</Text>
+        <Text style={styles.greeting}>Salam {username}</Text>
         <View style={styles.searchBar}>
           <Search size={18} color="#708090" style={styles.searchIcon} />
           <TextInput
@@ -415,7 +415,7 @@ const DiscoveryScreen = () => {
   animationType="slide"
   onRequestClose={() => setModalVisible(false)}
 >
-  <SafeAreaView style={styles.modalContainer}>
+  <SafeAreaProvider style={styles.modalContainer}>
     {selectedRecipe && (
       <>
         <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
@@ -463,9 +463,9 @@ const DiscoveryScreen = () => {
         </ScrollView>
       </>
     )}
-  </SafeAreaView>
+  </SafeAreaProvider>
 </Modal>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 
@@ -487,10 +487,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     backgroundColor: '#F5FFFA', // Mint Cream
   },
-  iconText: {
-    fontSize: 26,
-    color: '#004040', // Rich Black
-    fontWeight: '600',
+  logoIcon: {
+    width: 80,         // Set your logo's width
+    height: 80,        // Set your logo's height
+    resizeMode: 'contain', // 'contain' is usually best for logos
   },
   headerTitle: {
     alignItems: 'center',
