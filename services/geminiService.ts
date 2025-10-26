@@ -24,7 +24,7 @@ export interface Meal {
   fat_g: number;
 }
 
-const MealRecognitionPrompt = `You are a meal recognition AI. Identify the food in this image and return ONLY a JSON object with the following structure:
+const MealRecognitionPrompt = `Являясь AI по распознаванию блюд, определите еду на этом изображении и верните ТОЛЬКО объект JSON со следующей структурой:
 {
   "meal_name": "...",
   "description": "...",

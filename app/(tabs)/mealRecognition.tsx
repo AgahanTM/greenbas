@@ -1,4 +1,3 @@
-// app/(tabs)/MealRecognition.tsx
 import { analyzeImageWithGemini, Meal } from "@/services/geminiService";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -18,7 +17,7 @@ const ZW_COLORS = {
   BACKGROUND: '#f8fcf8',
   CARD: '#FFFFFF',
   PRIMARY_ACCENT: '#2EB86E',
-  SECONDARY_ACCENT: '#FFB84D', // tüm turuncu renk buraya taşındı
+  SECONDARY_ACCENT: '#FFB84D',
   TEXT_DARK: '#0F1724',
   TEXT_MUTED: '#64748b',
   BORDER: '#e2e8f0',
@@ -39,8 +38,8 @@ export default function MealRecognition() {
       const result = await analyzeImageWithGemini(uri, mimeType);
       setMealResult(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Analysis failed.";
-      Alert.alert("Analysis Failed", errorMessage);
+      const errorMessage = err instanceof Error ? err.message : "Analyz yalnys boldy.";
+      Alert.alert("Analyz yalnys boldy", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -49,7 +48,7 @@ export default function MealRecognition() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission Required", "Gallery access is required!");
+      Alert.alert("Rugsat gerek", "Galareya rugsat gerek!");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -66,7 +65,7 @@ export default function MealRecognition() {
   const openCamera = async () => {
     const { granted } = await requestPermission();
     if (!granted) {
-      Alert.alert("Permission Required", "Camera access is required!");
+      Alert.alert("Rugsat gerek", "Kamera rugsat gerek!");
       return;
     }
     setIsCameraActive(true);
@@ -93,7 +92,7 @@ export default function MealRecognition() {
         <CameraView style={styles.camera} ref={cameraRef} facing="back" />
         <View style={styles.cameraControls}>
           <TouchableOpacity onPress={() => setIsCameraActive(false)} style={styles.cameraButton}>
-            <Text style={styles.cameraButtonText}>Cancel</Text>
+            <Text style={styles.cameraButtonText}>Yza don</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={capturePhoto} style={styles.captureButton} />
         </View>
@@ -106,7 +105,7 @@ export default function MealRecognition() {
       {isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={ZW_COLORS.PRIMARY_ACCENT} />
-          <Text style={styles.infoText}>Analyzing your meal...</Text>
+          <Text style={styles.infoText}>Nahar tanalyar...</Text>
         </View>
       ) : imageUri && mealResult ? (
         <View style={styles.centerBox}>
@@ -115,26 +114,26 @@ export default function MealRecognition() {
             <Text style={styles.mealName}>{mealResult.meal_name}</Text>
             <Text style={styles.description}>{mealResult.description}</Text>
             <View style={styles.nutrients}>
-              <Text style={styles.nutrientText}>Calories: {mealResult.calories}</Text>
-              <Text style={styles.nutrientText}>Protein: {mealResult.protein_g} g</Text>
-              <Text style={styles.nutrientText}>Carbs: {mealResult.carbs_g} g</Text>
-              <Text style={styles.nutrientText}>Fat: {mealResult.fat_g} g</Text>
+              <Text style={styles.nutrientText}>Kaloriya: {mealResult.calories}</Text>
+              <Text style={styles.nutrientText}>Proteyin: {mealResult.protein_g} g</Text>
+              <Text style={styles.nutrientText}>Uglewodlar: {mealResult.carbs_g} g</Text>
+              <Text style={styles.nutrientText}>Yag: {mealResult.fat_g} g</Text>
             </View>
           </View>
           <TouchableOpacity onPress={resetState} style={styles.actionButton}>
-            <Text style={styles.buttonText}>Try Again</Text>
+            <Text style={styles.buttonText}>Tazeden synans</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.centerBox}>
           <View style={styles.card}>
-            <Text style={styles.title}>Meal Recognition</Text>
-            <Text style={styles.infoText}>Upload a photo or take a picture to analyze your meal.</Text>
+            <Text style={styles.title}>Nahar tanama</Text>
+            <Text style={styles.infoText}>Nahary tanamak ucin galareyadan yukle yada surata al.</Text>
             <TouchableOpacity onPress={openCamera} style={styles.actionButton}>
-              <Text style={styles.buttonText}>Take Photo</Text>
+              <Text style={styles.buttonText}>Surata al</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={pickImage} style={styles.actionButton}>
-              <Text style={styles.buttonText}>Upload from Gallery</Text>
+              <Text style={styles.buttonText}>Galareyadan yukle</Text>
             </TouchableOpacity>
           </View>
         </View>

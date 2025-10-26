@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator, // To show loading state
-  KeyboardAvoidingView, // Good practice for forms
-  Platform, // Replaces <input>
+  ActivityIndicator, 
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
-  StyleSheet, // Replaces <div>
-  Text, // Replaces <h2>, <p>, <span>, label
-  TextInput, // Required for styling
-  View, // Replaces <div>
+  StyleSheet,
+  Text, 
+  TextInput,
+  View, 
 } from 'react-native';
 import { supabase } from '../services/supabase';
 
@@ -35,9 +35,9 @@ const handleLogin = async (
       if (error) throw error;
 
       if (data.user && data.user.identities?.length === 0) {
-        setMessage("Sign up successful! Please check your email to confirm.");
+        setMessage("Agzalyk basaryly! Mail ini barla.");
       } else if (data.user) {
-        setMessage("Sign up successful! Please check your email for the confirmation link.");
+        setMessage("Agzalyk basaryly! Link ucin mail ini barla.");
       }
     } else {
       // --- Log In ---
@@ -49,7 +49,7 @@ const handleLogin = async (
       // Login success will be handled by App.tsx detecting the session change
     }
   } catch (error: any) {
-    setError(error.message || "An unexpected error occurred.");
+    setError(error.message || "Garasylmadyk nasazlyk.");
   } finally {
     setLoading(false);
   }
@@ -67,11 +67,11 @@ export default function Auth() {
   const handleSubmit = () => {
     // Basic validation
     if (!email.trim() || !password.trim()) {
-      setError('Email and password are required.');
+      setError('Email we parol gerekli.');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError('Parol in az 6 soz bolmaly.');
       return;
     }
     // The handler no longer takes a form event, so we call the login function directly
@@ -85,12 +85,12 @@ export default function Auth() {
     >
       <View style={styles.form}>
         <Text style={styles.title}>
-          {isSignUp ? 'Create an Account' : 'Log In'}
+          {isSignUp ? 'Akkaunt doret' : 'giris'}
         </Text>
         <Text style={styles.subtitle}>
           {isSignUp
-            ? 'Get started with your meal planner!'
-            : 'Access your saved meals.'}
+            ? 'Basla!'
+            : 'Bellap goyan naharlaryny gor.'}
         </Text>
 
         {/* Email Input */}
@@ -99,19 +99,19 @@ export default function Auth() {
           style={styles.input}
           onChangeText={setEmail}
           value={email}
-          placeholder="youremail@example.com"
+          placeholder="seninmailin@gmail.com"
           autoCapitalize="none"
           keyboardType="email-address"
         />
         
         {/* Password Input */}
-        <Text style={styles.label}>Password</Text>
+        <Text style={styles.label}>Parol(acar sozi)</Text>
         <TextInput
           style={styles.input}
           onChangeText={setPassword}
           value={password}
-          secureTextEntry={true} // Replaces type="password"
-          placeholder="Your password"
+          secureTextEntry={true}
+          placeholder="Parolyn"
           autoCapitalize="none"
         />
         
@@ -128,7 +128,7 @@ export default function Auth() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>
-              {isSignUp ? 'Sign Up' : 'Log In'}
+              {isSignUp ? 'Agza bol' : 'Giris'}
             </Text>
           )}
         </Pressable>
@@ -144,8 +144,8 @@ export default function Auth() {
         >
           <Text style={styles.toggleText}>
             {isSignUp
-              ? 'Already have an account? Log In'
-              : "Don't have an account? Sign Up"}
+              ? 'Agzalygyn bar bolsa giris et'
+              : "Agza bolmadynmy?, Agza bol"}
           </Text>
         </Pressable>
       </View>
@@ -156,7 +156,7 @@ export default function Auth() {
 // --- React Native StyleSheet for Styling ---
 const styles = StyleSheet.create({
   container: {
-    flex: 1, // Ensures it takes up the full screen height
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f9f9f9',
@@ -164,12 +164,12 @@ const styles = StyleSheet.create({
   form: {
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 32, // Replaces 2rem
+    padding: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 12,
-    elevation: 3, // For Android shadow
+    elevation: 3,
     width: '90%',
     maxWidth: 400,
   },

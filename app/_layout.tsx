@@ -20,13 +20,13 @@ export default function RootLayout() {
   useEffect(() => {
     let mounted = true;
 
-    // ✅ 1️⃣ Get current session from local storage
+    //Get current session from local storage
     const initSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      // ✅ 2️⃣ Double-check if session is still valid on the server
+      //Double-check if session is still valid on the server
       const {
         data: { user },
         error,
@@ -44,7 +44,7 @@ export default function RootLayout() {
 
     initSession();
 
-    // ✅ 3️⃣ Listen for future auth changes
+    //Listen for future auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (mounted) {
@@ -64,12 +64,12 @@ export default function RootLayout() {
     if (loading) return;
 
     if (session) {
-      // ✅ If logged in but currently on login screen → redirect to tabs
+      //If logged in but currently on login screen → redirect to tabs
       if (pathname === '/login') {
         router.replace('/(tabs)');
       }
     } else {
-      // ✅ If not logged in → redirect to login
+      //If not logged in → redirect to login
       if (pathname !== '/login') {
         router.replace('/login');
       }

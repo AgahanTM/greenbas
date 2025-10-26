@@ -305,8 +305,8 @@ const DiscoveryScreen = () => {
       <TouchableOpacity style={styles.recipeCard} onPress={() => showRecipeDetails(item)}>
         <Image source={{ uri: item.image_url ?? FALLBACK_IMAGE }} style={styles.recipeImage} resizeMode="cover" />
         <View style={styles.recipeInfo}>
-          <Text style={styles.recipeTitle}>{item.name_tk || 'Untitled Recipe'}</Text>
-          <Text style={styles.recipeTags}>{(item.tags || []).join(' - ') || 'No tags'}</Text>
+          <Text style={styles.recipeTitle}>{item.name_tk || 'Atsyz'}</Text>
+          <Text style={styles.recipeTags}>{(item.tags || []).join(' - ') || 'tag yok'}</Text>
           <View style={styles.recipeMeta}>
             <Text style={styles.recipeMetaText}>⭐ {item.difficulty || 'N/A'}</Text>
             <Text style={styles.recipeMetaText}> | </Text>
@@ -315,7 +315,7 @@ const DiscoveryScreen = () => {
             </Text>
             <TouchableOpacity
               style={styles.addToPlannerButton}
-              onPress={() => addToShoppingPlanner(item)} // Pass full recipe
+              onPress={() => addToShoppingPlanner(item)}
             >
               <Text style={styles.addToPlannerButtonText}>Sargamak plany</Text>
             </TouchableOpacity>
@@ -339,18 +339,17 @@ const DiscoveryScreen = () => {
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.headerSubtitle}>Hosgeldin</Text>
-          <Text style={styles.headerMainText}>{username} ▼</Text>
+          <Text style={styles.headerMainText}>{username}</Text>
         </View>
         
       </View>
 
       <View style={styles.staticContent}>
-        <Text style={styles.greeting}>Salam {username}</Text>
         <View style={styles.searchBar}>
           <Search size={18} color="#708090" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search recipes, ingredients..."
+            placeholder="Nahar we retsepler gozle..."
             placeholderTextColor="#708090"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -360,7 +359,7 @@ const DiscoveryScreen = () => {
         </View>
       </View>
 
-      {loading && <Text style={styles.loadingText}>Loading...</Text>}
+      {loading && <Text style={styles.loadingText}>Yuklenyar...</Text>}
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       <ScrollView
@@ -369,9 +368,9 @@ const DiscoveryScreen = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>All Categories</Text>
+          <Text style={styles.sectionTitle}>Kategoryalra</Text>
           <TouchableOpacity onPress={() => handleCategorySelect('')}>
-            <Text style={styles.seeAll}>See All {'>'}</Text>
+            <Text style={styles.seeAll}>Hemmesi {'>'}</Text>
           </TouchableOpacity>
         </View>
         {categories.length > 0 ? (
@@ -384,15 +383,15 @@ const DiscoveryScreen = () => {
             contentContainerStyle={{ paddingLeft: 20 }}
           />
         ) : (
-          <Text style={styles.noDataText}>No categories available</Text>
+          <Text style={styles.noDataText}>Kategorya elyeter dal</Text>
         )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {selectedCategory ? `Recipes in ${selectedCategory}` : 'Featured Recipes'}
+            {selectedCategory ? `Retseplary ${selectedCategory}` : 'Retseplar'}
           </Text>
           <TouchableOpacity onPress={() => handleCategorySelect('')}>
-            <Text style={styles.seeAll}>{selectedCategory ? 'Back to Featured >' : 'See All >'}</Text>
+            <Text style={styles.seeAll}>{selectedCategory ? 'Yza gayt >' : 'Hemmesini gor >'}</Text>
           </TouchableOpacity>
         </View>
         {featuredLoading ? (
@@ -404,7 +403,7 @@ const DiscoveryScreen = () => {
                 <React.Fragment key={item.id}>{renderRecipe({ item })}</React.Fragment>
               ))
             ) : (
-              <Text style={styles.noDataText}>No recipes available</Text>
+              <Text style={styles.noDataText}>Elyeter dal</Text>
             )}
           </View>
         )}
@@ -419,7 +418,7 @@ const DiscoveryScreen = () => {
     {selectedRecipe && (
       <>
         <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-          <Text style={styles.closeButtonText}>Close</Text>
+          <Text style={styles.closeButtonText}>Yap</Text>
         </TouchableOpacity>
         <ScrollView>
           <Image
@@ -427,38 +426,38 @@ const DiscoveryScreen = () => {
             style={styles.modalImage}
             resizeMode="cover"
           />
-          <Text style={styles.modalTitle}>{selectedRecipe.name_en || 'Untitled Recipe'}</Text>
-          <Text style={styles.modalSectionTitle}>Description</Text>
-          <Text style={styles.modalText}>{selectedRecipe.description_en ?? 'No description provided.'}</Text>
-          <Text style={styles.modalSectionTitle}>Ingredients</Text>
+          <Text style={styles.modalTitle}>{selectedRecipe.name_tk || 'Bas sozsuz'}</Text>
+          <Text style={styles.modalSectionTitle}>Acyklama</Text>
+          <Text style={styles.modalText}>{selectedRecipe.description_tk ?? 'Acyklama yok.'}</Text>
+          <Text style={styles.modalSectionTitle}>Ingridientlar</Text>
           {safeGetIngredients(selectedRecipe).map((ing, idx) => (
             <Text key={idx} style={styles.modalText}>
               • {ing.quantity} {ing.unit} {ing.name}
             </Text>
           ))}
-          <Text style={styles.modalSectionTitle}>Instructions</Text>
-          {(selectedRecipe.instructions_en || []).map((s) => (
+          <Text style={styles.modalSectionTitle}>Instruksiya</Text>
+          {(selectedRecipe.instructions_tk || []).map((s) => (
             <Text key={s.step} style={styles.modalText}>
               {s.step}. {s.text}
             </Text>
           ))}
-          <Text style={styles.modalSectionTitle}>Details</Text>
+          <Text style={styles.modalSectionTitle}>Gosmaca</Text>
           <Text style={styles.modalText}>
-            Prep: {selectedRecipe.prep_time_minutes ?? '-'} minutes
+            Tayyarlyk: {selectedRecipe.prep_time_minutes ?? '-'} minut
           </Text>
           <Text style={styles.modalText}>
-            Cook: {selectedRecipe.cook_time_minutes ?? '-'} minutes
+            Bisirmek: {selectedRecipe.cook_time_minutes ?? '-'} minut
           </Text>
-          <Text style={styles.modalText}>Serves: {selectedRecipe.servings ?? '-'}</Text>
-          <Text style={styles.modalText}>Difficulty: {selectedRecipe.difficulty ?? 'N/A'}</Text>
+          <Text style={styles.modalText}>Servis: {selectedRecipe.servings ?? '-'}</Text>
+          <Text style={styles.modalText}>Kynlygy: {selectedRecipe.difficulty ?? 'N/A'}</Text>
           <Text style={styles.modalText}>
-            Tags: {(selectedRecipe.tags || []).join(', ') || 'None'}
+            Tags: {(selectedRecipe.tags || []).join(', ') || 'Yok'}
           </Text>
           <TouchableOpacity
             style={styles.addToPlannerButton}
-            onPress={() => addToShoppingPlanner(selectedRecipe)} // Pass full recipe
+            onPress={() => addToShoppingPlanner(selectedRecipe)}
           >
-            <Text style={styles.addToPlannerButtonText}>Add to Planner</Text>
+            <Text style={styles.addToPlannerButtonText}>Bellap goymak</Text>
           </TouchableOpacity>
         </ScrollView>
       </>

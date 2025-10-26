@@ -2,12 +2,12 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: "greenbas",
-    slug: "greenbas",
-    version: "1.0.0",
+    name: "Ýaşyl Sepet",
+    slug: "Ýaşyl Sepet",
+    version: "1.1.1",
     orientation: "portrait",
-    icon: "./assets/images/icon.png",
-    scheme: "greenbas",
+    icon: "./assets/images/logo.png",
+    scheme: "Ýaşyl Sepet",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
 
@@ -21,7 +21,7 @@ export default {
         foregroundImage: "./assets/images/android-icon-foreground.png",
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
-        backgroundColor: "#E6F4FE"
+        backgroundColor: "#E6F4FE",
       },
       edgeToEdge: true,
       package: "com.madara99.greenbas"
@@ -37,7 +37,7 @@ export default {
       [
         "expo-splash-screen",
         {
-          image: "./assets/images/splash-icon.png",
+          image: "./assets/images/logo.png",
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffff",

@@ -14,7 +14,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="discovery"
         options={{
-          title: "Discover",
+          title: "Bas sahypa",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="restaurant-outline" size={size} color={color} />
           ),
@@ -23,7 +23,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="mealRecognition"
         options={{
-          title: "Recognize",
+          title: "N.Tanamak",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="camera-outline" size={size} color={color} />
           ),
@@ -41,7 +41,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="zeroWaste"
         options={{
-          title: "Zero Waste",
+          title: "Ekonom rezim",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="leaf-outline" size={size} color={color} />
           ),
@@ -50,7 +50,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "Profil",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

@@ -1,10 +1,8 @@
-// app/shoppingPlanner.tsx
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -12,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { router } from 'expo-router';
 import { Check } from 'lucide-react-native';
@@ -45,8 +44,8 @@ type StoreTotals = {
 
 // Mock grocery stores
 const STORES: Store[] = [
-  { name: 'EcoMart', pricePerUnit: 1.5 },
-  { name: 'GreenGrocer', pricePerUnit: 2.0 },
+  { name: 'Dukan 1', pricePerUnit: 1.5 },
+  { name: 'Dukan 2', pricePerUnit: 2.0 },
 ];
 
 const ShoppingPlanner = () => {
@@ -61,7 +60,7 @@ const ShoppingPlanner = () => {
     try {
       if (!ingredientsParam || typeof ingredientsParam !== 'string') {
         console.warn('Missing or invalid ingredients parameter');
-        setError('No ingredients provided. Please go back and select a recipe.');
+        setError('Ingridientler saylanmady. Yza gayt we sayla.');
         setLoading(false);
         return;
       }
@@ -71,7 +70,7 @@ const ShoppingPlanner = () => {
 
       if (!Array.isArray(decodedIngredients) || decodedIngredients.length === 0) {
         console.warn('Invalid or empty ingredients array');
-        setError('No valid ingredients found. Please go back and try again.');
+        setError('Ingridientler tapylmady. Tazeden synansyn.');
         setLoading(false);
         return;
       }
@@ -86,7 +85,7 @@ const ShoppingPlanner = () => {
       calculateTotals(formattedIngredients);
     } catch (err: any) {
       console.error('Error parsing ingredients:', err);
-      setError('Failed to load ingredients. Please go back and try again.');
+      setError('Ingridientler yuklenmedi. Tazeden synansyn.');
     } finally {
       setLoading(false);
     }
@@ -139,23 +138,23 @@ const ShoppingPlanner = () => {
   const handleOrderFromStore = (storeTotals: StoreTotals) => {
     const selectedIngredients = storeTotals.ingredients.filter((ing) => ing.selected);
     if (selectedIngredients.length === 0) {
-      Alert.alert('No Ingredients Selected', 'Please select at least one ingredient to place an order.', [
-        { text: 'OK', style: 'cancel' },
+      Alert.alert('Ingridientler saylanmady', 'In azyndan 1 ingridient saylan.', [
+        { text: 'Bolya', style: 'cancel' },
       ]);
       return;
     }
     Alert.alert(
-      `Order from ${storeTotals.store}`,
-      `Total: $${storeTotals.total.toFixed(2)}\n\nIngredients:\n${selectedIngredients
-        .map((ing) => `${ing.quantity} ${ing.unit} ${ing.name} ($${ing.totalPrice.toFixed(2)})`)
+      `Sundan sarga ${storeTotals.store}`,
+      `Jemi: TMT ${storeTotals.total.toFixed(2)}\n\nIngridientlar:\n${selectedIngredients
+        .map((ing) => `${ing.quantity} ${ing.unit} ${ing.name} (TMT ${ing.totalPrice.toFixed(2)})`)
         .join('\n')}`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Yza don', style: 'cancel' },
         {
-          text: 'Confirm Order',
+          text: 'Tassykla',
           onPress: () => {
-            Alert.alert('Order Confirmed!', `Your order from ${storeTotals.store} has been placed!`, [
-              { text: 'OK', onPress: () => router.back() },
+            Alert.alert('Zakaz alyndy!', `Senin su magazinden zakazyn ${storeTotals.store} alyndy!`, [
+              { text: 'Bolya', onPress: () => router.back() },
             ]);
           },
         },
@@ -180,7 +179,7 @@ const ShoppingPlanner = () => {
       </View>
       <Text style={styles.ingredientName}>{item.name}</Text>
       <Text style={styles.ingredientDetails}>
-        {item.quantity} {item.unit} - ${item.totalPrice.toFixed(2)}
+        {item.quantity} {item.unit} - TMT {item.totalPrice.toFixed(2)}
       </Text>
     </TouchableOpacity>
   );
@@ -189,7 +188,7 @@ const ShoppingPlanner = () => {
     <View key={storeTotals.store} style={[styles.storeSection, index === 1 && styles.storeSectionLast]}>
       <View style={styles.storeHeader}>
         <Text style={styles.storeName}>{storeTotals.store}</Text>
-        <Text style={styles.storeTotal}>Total: ${storeTotals.total.toFixed(2)}</Text>
+        <Text style={styles.storeTotal}>Jemi: TMT {storeTotals.total.toFixed(2)}</Text>
       </View>
       <FlatList
         data={storeTotals.ingredients}
@@ -199,39 +198,39 @@ const ShoppingPlanner = () => {
         style={styles.ingredientsList}
       />
       <TouchableOpacity style={styles.orderButton} onPress={() => handleOrderFromStore(storeTotals)}>
-        <Text style={styles.orderButtonText}>Order from {storeTotals.store}</Text>
+        <Text style={styles.orderButtonText}>Sundan sarga {storeTotals.store}</Text>
       </TouchableOpacity>
     </View>
   );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaProvider style={styles.container}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#E8B923" />
-          <Text style={styles.loadingText}>Loading your shopping list...</Text>
+          <Text style={styles.loadingText}>Listin yuklenyar...</Text>
         </View>
-      </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaProvider style={styles.container}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <Text style={styles.backButtonText}>Yza gayt</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaProvider style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
@@ -239,24 +238,24 @@ const ShoppingPlanner = () => {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.pageTitle}>
-            Shopping Planner {recipe_name ? `for \n ${decodeURIComponent(recipe_name)}` : ''}
+            Planner {recipe_name ? `ucin \n${decodeURIComponent(recipe_name)}` : ''}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.content}>
           <Text style={styles.introText}>
-            Your recipe's ingredients are listed below. Uncheck items you already have, then order from the best store.
+            Senin ingridient listin asakda. Bar zatlaryny listden cykar, we in gowy dukanlardan sarga.
           </Text>
 
           {storeTotals.length > 0 ? (
             storeTotals.map((totals, index) => renderStoreSection(totals, index))
           ) : (
-            <Text style={styles.noDataText}>No ingredients available</Text>
+            <Text style={styles.noDataText}>Hic ingridient yok</Text>
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 
