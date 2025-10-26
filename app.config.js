@@ -18,10 +18,10 @@ export default {
 
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/images/android-icon-foreground.png",
-        backgroundImage: "./assets/images/android-icon-background.png",
-        monochromeImage: "./assets/images/android-icon-monochrome.png",
-        backgroundColor: "#E6F4FE",
+        foregroundImage: "./assets/images/logo.png",
+        backgroundImage: "./assets/images/logo.png",
+        monochromeImage: "./assets/images/logo.png",
+        backgroundColor: "#a4ff9896",
       },
       edgeToEdge: true,
       package: "com.madara99.greenbas"
@@ -59,7 +59,7 @@ export default {
 
     extra: {
       eas: {
-        projectId: "6e2fa8da-a50b-40ed-a00f-1b0533276b14", // ✅ Added manually
+        projectId: "6e2fa8da-a50b-40ed-a00f-1b0533276b14",
         build: {
           experimental: {
             env: true
