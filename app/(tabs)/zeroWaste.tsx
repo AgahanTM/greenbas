@@ -91,20 +91,49 @@ export default function ZeroWasteScreen() {
       let ingredientId = selectedIngredientId;
 
       if (!ingredientId && newItemName.trim()) {
-        const { data: ingredientData, error: ingredientError } = await supabase
-          .from("ingredients")
-          .insert({
-            name_tk: newItemName,
-            default_unit: unit,
-          })
-          .select("id")
-          .single();
+  // Ingredient barlanylýar
+  const { data: existingIngredient } = await supabase
+    .from("ingredients")
+    .select("id")
+    .eq("name_tk", newItemName)
+    .single();
 
-        if (ingredientError) throw ingredientError;
-        ingredientId = ingredientData.id;
-        setNewItemName("");
-        fetchIngredients();
-      }
+  if (!ingredientId && newItemName.trim()) {
+  // Ingredient barlanylýar
+  const { data: existingIngredient } = await supabase
+    .from("ingredients")
+    .select("id")
+    .eq("name_tk", newItemName)
+    .single();
+
+  if (existingIngredient) {
+    ingredientId = existingIngredient.id; // bar bolsa şol ID-ni ulanylýar
+  } else {
+    // Yok bolsa täze goşulýar
+    const { data: ingredientData, error: ingredientError } = await supabase
+      .from("ingredients")
+      .insert({
+        name_tk: newItemName,
+        name_en: newItemName,
+        default_unit: unit,
+      })
+      .select("id")
+      .single();
+
+    if (ingredientError) throw ingredientError;
+    ingredientId = ingredientData.id;
+    fetchIngredients();
+  }
+
+  // 🟢 Täze ingredient derrew seçilýär
+  setSelectedIngredientId(ingredientId);
+  setNewItemName("");
+  setIsAddingCustom(false);
+  setUnit(unit); // ýa-da ingredientData.default_unit
+}
+
+}
+
 
       const { error } = await supabase.from("pantry_items").insert([
         {
@@ -293,7 +322,7 @@ export default function ZeroWasteScreen() {
           disabled={loadingRecommend || pantryItems.length === 0}
         >
           <Text style={styles.buttonText}>
-            {loadingRecommend ? "TEKLIP DÄREDILÝÄR..." : "AI NAHAR TEKLIPI AL"}
+            {loadingRecommend ? "TEKLIP DÖREDILÝÄR..." : "AI NAHAR TEKLIPI AL"}
           </Text>
         </TouchableOpacity>
 

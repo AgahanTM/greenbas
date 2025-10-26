@@ -454,10 +454,10 @@ const DiscoveryScreen = () => {
             Tags: {(selectedRecipe.tags || []).join(', ') || 'Yok'}
           </Text>
           <TouchableOpacity
-            style={styles.addToPlannerButton}
+            style={[styles.addToPlannerButton, { marginBottom: 20 }]}
             onPress={() => addToShoppingPlanner(selectedRecipe)}
           >
-            <Text style={styles.addToPlannerButtonText}>Bellap goymak</Text>
+            <Text style={[styles.addToPlannerButtonText]}>Bellap goymak</Text>
           </TouchableOpacity>
         </ScrollView>
       </>
@@ -496,6 +496,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
+    marginRight: 15,
     color: '#708090', // Slate Gray
     fontWeight: '700',
   },
