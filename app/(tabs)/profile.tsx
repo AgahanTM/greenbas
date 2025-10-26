@@ -23,12 +23,12 @@ interface Profile {
   updated_at: string | null;
 }
 
-// Renk kodları
+// Renk kodlary
 const COLORS = {
   BACKGROUND: '#F7FCF8',
   CARD: '#000000ff',
   TEXT: '#ffffffff',
-  ACCENT: '#FFB84D',
+  ACCENT: '#E8B923',
 };
 
 export default function ProfileScreen() {
@@ -55,7 +55,7 @@ export default function ProfileScreen() {
         setLoading(true);
         setError(null);
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) throw new Error('No user logged in');
+        if (userError || !user) throw new Error('Ulanyjy girmedi');
         setUserId(user.id);
 
         const { data, error } = await supabase
@@ -69,8 +69,8 @@ export default function ProfileScreen() {
         setProfile(data);
         setEditedProfile(data);
       } catch (error: any) {
-        console.error('Error fetching profile:', error.message);
-        setError('Failed to load profile data');
+        console.error('Profil ýüklenmesinde ýalňyşlyk:', error.message);
+        setError('Profil maglumatlaryny ýüklemek başa barmady');
       } finally {
         setLoading(false);
       }
@@ -84,14 +84,14 @@ export default function ProfileScreen() {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error: any) {
-      console.error('Logout error:', error.message);
-      Alert.alert('Error', 'Failed to log out');
+      console.error('Çykyş ýalňyşlygy:', error.message);
+      Alert.alert('Ýalňyşlyk', 'Çykmak başa barmady');
     }
   };
 
   const handleChangePassword = async () => {
     if (!newPassword || newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+      Alert.alert('Ýalňyşlyk', 'Parol azyndan 6 simwoldan ybarat bolmaly.');
       return;
     }
 
@@ -101,24 +101,24 @@ export default function ProfileScreen() {
       if (error) throw error;
       setIsChangingPassword(false);
       setNewPassword('');
-      Alert.alert('Success', 'Password updated successfully! Please log in again.');
+      Alert.alert('Üstünlik', 'Parol üstünlikli täzelendi! Täzeden giriň.');
       await handleLogout();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update password');
+      Alert.alert('Ýalňyşlyk', error.message || 'Paroly täzelemek başa barmady');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSupport = () => {
-    Alert.alert('Support', 'Need help? Contact us at agahanyazmyradov.vercel.app');
+    Alert.alert('Goldaw', 'Kömek gerekmi? Bize şu ýerden ýazyň: agahanyazmyradov.vercel.app');
   };
 
   const handleSaveProfile = async () => {
     try {
       setLoading(true);
 
-      // avatar_url artık sadece local URI
+      // avatar_url şu wagt diňe ýerli URI
       const avatar_url = editedProfile.avatar_url;
 
       const { error } = await supabase
@@ -135,9 +135,9 @@ export default function ProfileScreen() {
 
       setProfile({ ...editedProfile, avatar_url });
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert('Üstünlik', 'Profil üstünlikli täzelendi!');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      Alert.alert('Ýalňyşlyk', error.message || 'Profili täzelemek başa barmady');
     } finally {
       setLoading(false);
     }
@@ -150,7 +150,7 @@ export default function ProfileScreen() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
-        Alert.alert('Permission', fromCamera ? 'Camera permission is required!' : 'Photo library permission is required!');
+        Alert.alert('Rugsat', fromCamera ? 'Kamera rugsady zerur!' : 'Surat galereýasy rugsady zerur!');
         return;
       }
 
@@ -162,7 +162,7 @@ export default function ProfileScreen() {
         setEditedProfile({ ...editedProfile, avatar_url: result.assets[0].uri });
       }
     } catch (error: any) {
-      console.error('Image picker error:', error.message);
+      console.error('Surat saýlama ýalňyşlygy:', error.message);
     } finally {
       setIsAvatarModalVisible(false);
     }
@@ -172,7 +172,7 @@ export default function ProfileScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={COLORS.ACCENT} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Ýüklenýär...</Text>
       </View>
     );
   }
@@ -182,7 +182,7 @@ export default function ProfileScreen() {
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => setLoading(true)}>
-          <Text style={styles.buttonText}>Retry</Text>
+          <Text style={styles.buttonText}>Täzeden synanyş</Text>
         </TouchableOpacity>
       </View>
     );
@@ -191,8 +191,12 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.menuIcon}>☰</Text>
-        <Text style={styles.welcomeText}>WELCOME {profile?.username || 'Guest'}</Text>
+        <Image
+  source={require('../../assets/images/logo.png')}
+  style={styles.menuIcon}
+  resizeMode="contain"
+/>
+        <Text style={styles.welcomeText}>HOŞ GELDIŇIZ {profile?.username || 'Myhman'}</Text>
       </View>
 
       <View style={styles.profileCard}>
@@ -208,69 +212,69 @@ export default function ProfileScreen() {
               style={styles.avatar}
             />
           </TouchableOpacity>
-          <Text style={styles.nameText}>{profile?.full_name || 'User'}</Text>
-          <Text style={styles.usernameText}>@{profile?.username || 'No username'}</Text>
-          <Text style={styles.detailText}>App Mode: {profile?.app_mode || 'Default'}</Text>
-          <Text style={styles.detailText}>Updated: {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}</Text>
+          <Text style={styles.nameText}>{profile?.full_name || 'Ulanyjy'}</Text>
+          <Text style={styles.usernameText}>@{profile?.username || 'Ulanyjy ady ýok'}</Text>
+          <Text style={styles.detailText}>Programma tertibi: {profile?.app_mode || 'Adaty'}</Text>
+          <Text style={styles.detailText}>Täzelendi: {new Date(profile?.updated_at || Date.now()).toLocaleDateString('tk-TM')}</Text>
         </View>
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.actionButton} onPress={() => setIsEditing(true)}>
-            <Text style={styles.buttonText}>Edit Profile</Text>
+            <Text style={styles.buttonText}>Profili redaktirlemek</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={() => setIsChangingPassword(true)}>
-            <Text style={styles.buttonText}>Change Password</Text>
+            <Text style={styles.buttonText}>Paroly çalyşmak</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleSupport}>
-            <Text style={styles.buttonText}>Support</Text>
+            <Text style={styles.buttonText}>Goldaw</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-            <Text style={styles.buttonText}>Sign Out</Text>
+            <Text style={styles.buttonText}>Çykmak</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {isEditing && (
         <View style={styles.editCard}>
-          <Text style={styles.editTitle}>Edit Profile</Text>
+          <Text style={styles.editTitle}>Profili redaktirlemek</Text>
           <TextInput
             style={styles.input}
             value={editedProfile.full_name || ''}
             onChangeText={(text) => setEditedProfile({ ...editedProfile, full_name: text })}
-            placeholder="Full Name"
-            placeholderTextColor="#94a3b8" 
+            placeholder="Doly ady"
+            placeholderTextColor="#94a3b8"
           />
           <TextInput
             style={styles.input}
             value={editedProfile.username || ''}
             onChangeText={(text) => setEditedProfile({ ...editedProfile, username: text })}
-            placeholder="Username"
-            placeholderTextColor="#94a3b8" 
+            placeholder="Ulanyjy ady"
+            placeholderTextColor="#94a3b8"
           />
           <TextInput
             style={styles.input}
             value={editedProfile.app_mode || ''}
             onChangeText={(text) => setEditedProfile({ ...editedProfile, app_mode: text })}
-            placeholder="App Mode"
-            placeholderTextColor="#94a3b8" 
+            placeholder="Programma tertibi"
+            placeholderTextColor="#94a3b8"
           />
           <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
-            <Text style={styles.buttonText}>SAVE</Text>
+            <Text style={styles.buttonText}>ÝATDA SAKLA</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.saveButton, { backgroundColor: COLORS.TEXT, marginTop: 10 }]} onPress={() => setIsEditing(false)}>
-            <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Cancel</Text>
+            <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Ýatyryň</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Password Modal */}
+      {/* Parol modaly */}
       <Modal visible={isChangingPassword} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Change Password</Text>
+            <Text style={styles.modalTitle}>Paroly çalyşmak</Text>
             <TextInput
               style={styles.input}
-              placeholder="New Password"
+              placeholder="Täze parol"
               placeholderTextColor="#94a3b8"
               secureTextEntry
               value={newPassword}
@@ -278,32 +282,32 @@ export default function ProfileScreen() {
             />
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity style={styles.modalButton} onPress={handleChangePassword}>
-                <Text style={styles.buttonText}>Change</Text>
+                <Text style={styles.buttonText}>Çalyş</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, { backgroundColor: COLORS.TEXT, marginLeft: 10 }]} onPress={() => setIsChangingPassword(false)}>
-                <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Cancel</Text>
+                <Text style={[styles.buttonText, { color: COLORS.CARD }]}>Ýatyryň</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Avatar Modal */}
+      {/* Awatar modaly */}
       <Modal visible={isAvatarModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Avatar</Text>
+            <Text style={styles.modalTitle}>Awatar saýla</Text>
             
             <TouchableOpacity style={styles.avatarModalButton} onPress={() => pickImage(true)}>
-              <Text style={styles.avatarModalButtonText}>Take Photo</Text>
+              <Text style={styles.avatarModalButtonText}>Surat çek</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.avatarModalButton} onPress={() => pickImage(false)}>
-              <Text style={styles.avatarModalButtonText}>Choose from Library</Text>
+              <Text style={styles.avatarModalButtonText}>Galereýadan saýla</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.avatarModalButton, { backgroundColor: COLORS.TEXT }]} onPress={() => setIsAvatarModalVisible(false)}>
-              <Text style={[styles.avatarModalButtonText, { color: COLORS.CARD }]}>Cancel</Text>
+              <Text style={styles.avatarModalButtonTextYatyryn}>Ýatyryň</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -321,7 +325,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 40,
   },
-  menuIcon: { fontSize: 24, color: 'black', fontWeight: 'bold' },
+  menuIcon: { 
+    width: 80, // Adjusted for logo size
+    height: 80, 
+  },
   welcomeText: { fontSize: 20, fontWeight: 'bold', color: 'black' },
   profileCard: { backgroundColor: 'white', borderRadius: 16, padding: 20, shadowColor: 'black', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 8, marginBottom: 20, justifyContent: 'space-between', minHeight: 550, borderWidth: 1, borderColor: '#e2e8f0' },
   logo: { width: 150, height: 50, marginBottom: 15 },
@@ -329,7 +336,18 @@ const styles = StyleSheet.create({
   nameText: { fontSize: 24, fontWeight: '900', color: 'black', marginBottom: 5 },
   usernameText: { fontSize: 16, color: COLORS.ACCENT, marginBottom: 10, fontWeight: '600' },
   detailText: { fontSize: 14, color: 'black', marginTop: 2, opacity: 0.7 },
-  buttonContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 15 },
+  buttonContainer: { 
+  flexDirection: 'row', 
+  flexWrap: 'wrap', 
+  justifyContent: 'center', 
+  marginTop: 15,
+
+  // --- ADDED POSITIONING FOR BOTTOM CENTER ---
+  position: 'absolute', // Takes it out of the normal document flow
+  bottom: 30,          // Position 30 units from the bottom
+  left: 0,             // Anchor to the left edge
+  right: 0,            // Anchor to the right edge
+  },
   actionButton: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 30, backgroundColor: COLORS.ACCENT, margin: 5, shadowColor: COLORS.ACCENT, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 5, elevation: 5 },
   buttonText: { color: COLORS.TEXT, fontWeight: '700', textAlign: 'center' },
   editCard: { padding: 20, marginBottom: 20, borderRadius: 12, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0' },
@@ -344,6 +362,7 @@ const styles = StyleSheet.create({
   modalButtonText: { color: COLORS.TEXT, fontWeight: '700', textAlign: 'center', fontSize: 16 },
   avatarModalButton: { backgroundColor: COLORS.ACCENT, borderRadius: 30, paddingVertical: 14, marginBottom: 12, alignItems: 'center', shadowColor: COLORS.ACCENT, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 5, elevation: 5 },
   avatarModalButtonText: { color: COLORS.TEXT, fontWeight: '700', fontSize: 16 },
+  avatarModalButtonTextYatyryn: { color: 'black', fontWeight: '700', fontSize: 16 },
   loadingText: { fontSize: 18, color: 'black', marginTop: 10, fontWeight: '500' },
   errorText: { fontSize: 16, color: '#dc3545', fontWeight: 'bold' },
   retryButton: { backgroundColor: COLORS.ACCENT, borderRadius: 30, padding: 12, marginTop: 15, shadowColor: COLORS.ACCENT }

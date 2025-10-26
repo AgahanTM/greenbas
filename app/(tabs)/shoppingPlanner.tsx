@@ -65,7 +65,7 @@ const ShoppingPlanner = () => {
         return;
       }
 
-      const decodedIngredients = JSON.parse(decodeURIComponent(ingredientsParam));
+      const decodedIngredients = JSON.parse(ingredientsParam);
       console.log('Parsed ingredients:', decodedIngredients);
 
       if (!Array.isArray(decodedIngredients) || decodedIngredients.length === 0) {
@@ -238,7 +238,7 @@ const ShoppingPlanner = () => {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.pageTitle}>
-            Planner {recipe_name ? `ucin \n${decodeURIComponent(recipe_name)}` : ''}
+            Planner {recipe_name ? `ucin \n${recipe_name}` : ''}
           </Text>
           <View style={styles.headerSpacer} />
         </View>

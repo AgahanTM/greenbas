@@ -85,12 +85,12 @@ export default function Auth() {
     >
       <View style={styles.form}>
         <Text style={styles.title}>
-          {isSignUp ? 'Akkaunt doret' : 'giris'}
+          {isSignUp ? 'Akkaunt doret' : 'Giris'}
         </Text>
         <Text style={styles.subtitle}>
           {isSignUp
             ? 'Basla!'
-            : 'Bellap goyan naharlaryny gor.'}
+            : 'Dürli iýmitleriň düzümini gör.'}
         </Text>
 
         {/* Email Input */}
